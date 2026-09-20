@@ -1,0 +1,73 @@
+using Kododo.Polyglot.Web.Auth;
+using Kododo.Polyglot.Web.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Kododo.Polyglot.Web.Pages.Admin;
+
+[Authorize(Policy = PolyglotPolicies.Admin)]
+public class UsersModel(UserService users) : PageModel
+{
+    public class CreateInput
+    {
+        public string Username { get; set; } = "";
+
+        public string? DisplayName { get; set; }
+
+        public string Password { get; set; } = "";
+
+        public UserRole Role { get; set; } = UserRole.Editor;
+    }
+
+    [BindProperty] public CreateInput Input { get; set; } = new();
+
+    [TempData] public string? Message { get; set; }
+
+    public IReadOnlyList<User> Users { get; private set; } = [];
+
+    public string[] Errors { get; private set; } = [];
+
+    public async Task OnGetAsync() => Users = await users.ListAsync(HttpContext.RequestAborted);
+
+    public async Task<IActionResult> OnPostCreateAsync()
+    {
+        var (user, errors) = await users.CreateLocalAsync(
+            Input.Username ?? "", Input.DisplayName, Input.Password ?? "",
+            Input.Role == UserRole.Admin ? UserRole.Admin : UserRole.Editor, HttpContext.RequestAborted);
+
+        if (user is null)
+            return await ShowErrorsAsync(errors);
+
+        Message = $"Created user '{user.Username}'.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRoleAsync(Guid id, UserRole role)
+        => await ApplyAsync(await users.SetRoleAsync(id, role, HttpContext.RequestAborted), "Role updated.");
+
+    public async Task<IActionResult> OnPostDisabledAsync(Guid id, bool disabled)
+        => await ApplyAsync(
+            await users.SetDisabledAsync(id, disabled, HttpContext.RequestAborted),
+            disabled ? "User disabled." : "User enabled.");
+
+    public async Task<IActionResult> OnPostResetPasswordAsync(Guid id, string newPassword)
+        => await ApplyAsync(
+            await users.SetPasswordAsync(id, newPassword ?? "", HttpContext.RequestAborted), "Password reset.");
+
+    private async Task<IActionResult> ApplyAsync(string[] errors, string success)
+    {
+        if (errors.Length > 0)
+            return await ShowErrorsAsync(errors);
+
+        Message = success;
+        return RedirectToPage();
+    }
+
+    private async Task<IActionResult> ShowErrorsAsync(string[] errors)
+    {
+        Errors = errors;
+        Users = await users.ListAsync(HttpContext.RequestAborted);
+        return Page();
+    }
+}

@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="Polyglot.Web.Tests/Polyglot.Web.Tests.csproj" />
+  </Folder>
+  <Project Path="Polyglot.Web/Polyglot.Web.csproj" />
+</Solution>

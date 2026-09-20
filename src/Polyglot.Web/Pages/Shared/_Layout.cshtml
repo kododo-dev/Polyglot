@@ -1,0 +1,55 @@
+@using Kododo.Polyglot.Web.Auth
+@using System.Security.Claims
+@inject PolyglotOptions Polyglot
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@(ViewData["Title"] is string t ? $"{t} · Polyglot" : "Polyglot")</title>
+    <style>
+        :root { --bg:#f6f7f9; --fg:#1b1f24; --muted:#5d6774; --card:#fff; --line:#dde1e6; --accent:#2f6fed; --danger:#c62828; --ok:#1b7f3b; }
+        @@media (prefers-color-scheme: dark) {
+            :root { --bg:#14171b; --fg:#e6e9ed; --muted:#98a2b0; --card:#1d2126; --line:#2f353c; --accent:#6f9bff; --danger:#ef6b6b; --ok:#5fcf80; }
+        }
+        * { box-sizing: border-box; }
+        body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+        header { display:flex; align-items:center; gap:16px; padding:12px 24px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+        header .brand { font-weight:700; margin-right:auto; color:var(--fg); text-decoration:none; }
+        header a, header button.link { color:var(--accent); text-decoration:none; background:none; border:0; font:inherit; cursor:pointer; padding:0; margin:0; }
+        main { max-width:760px; margin:32px auto; padding:0 16px; }
+        .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:20px 24px; margin-bottom:20px; }
+        h1 { font-size:22px; margin:0 0 16px; } h2 { font-size:17px; margin:0 0 12px; }
+        label { display:block; font-weight:600; margin:12px 0 4px; }
+        input[type=text], input[type=password], select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+        button, .btn { display:inline-block; padding:8px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; cursor:pointer; text-decoration:none; margin-top:16px; }
+        button.secondary { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:0; padding:4px 10px; }
+        .btn.sso { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+        .error { color:var(--danger); } .ok { color:var(--ok); } .muted { color:var(--muted); }
+        table { width:100%; border-collapse:collapse; } th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
+        td form { display:inline-block; margin:0 4px 0 0; } td select { width:auto; padding:4px 6px; }
+        td input[type=password] { width:150px; padding:4px 6px; }
+        .tag { font-size:12px; border:1px solid var(--line); border-radius:99px; padding:1px 8px; color:var(--muted); }
+        ul.links { list-style:none; margin:0; padding:0; } ul.links li { margin:8px 0; }
+    </style>
+</head>
+<body>
+<header>
+    <a class="brand" href="@Url.Content("~/")">Polyglot</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        @if (User.IsInRole(nameof(UserRole.Admin)) || User.IsInRole(nameof(UserRole.Editor)))
+        {
+            <a href="@($"{Context.Request.PathBase}{Polyglot.GetEditorPath()}/")">Translations</a>
+        }
+        @if (User.IsInRole(nameof(UserRole.Admin)))
+        {
+            <a asp-page="/Admin/Users">Users</a>
+        }
+        <a asp-page="/Account">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
+        <form method="post" asp-page="/Logout" style="margin:0"><button class="link" type="submit">Sign out</button></form>
+    }
+</header>
+<main>@RenderBody()</main>
+</body>
+</html>

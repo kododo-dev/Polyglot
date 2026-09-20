@@ -1,0 +1,26 @@
+@page "/login"
+@model LoginModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+<div class="card">
+    <h1>Sign in</h1>
+    @if (Model.Error is not null)
+    {
+        <p class="error">@Model.Error</p>
+    }
+    @if (Model.LocalEnabled)
+    {
+        <form method="post" asp-route-returnUrl="@Model.ReturnUrl">
+            <label for="username">Username</label>
+            <input id="username" type="text" asp-for="Username" autocomplete="username" autofocus>
+            <label for="password">Password</label>
+            <input id="password" type="password" asp-for="Password" autocomplete="current-password">
+            <button type="submit">Sign in</button>
+        </form>
+    }
+    @if (Model.OidcName is not null)
+    {
+        <p><a class="btn sso" asp-page-handler="Oidc" asp-route-returnUrl="@Model.ReturnUrl">@Model.OidcName</a></p>
+    }
+</div>

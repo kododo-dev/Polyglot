@@ -1,0 +1,24 @@
+@page "/account"
+@model AccountModel
+@{
+    ViewData["Title"] = "Account";
+}
+<div class="card">
+    <h1>Account</h1>
+    <p><strong>@Model.Username</strong> <span class="tag">@Model.Role</span></p>
+    @if (Model.Message is not null) { <p class="ok">@Model.Message</p> }
+</div>
+@if (Model.HasPassword)
+{
+    <div class="card">
+        <h2>Change password</h2>
+        @foreach (var error in Model.Errors) { <p class="error">@error</p> }
+        <form method="post">
+            <label for="current">Current password</label>
+            <input id="current" type="password" asp-for="Input.CurrentPassword" autocomplete="current-password">
+            <label for="new">New password</label>
+            <input id="new" type="password" asp-for="Input.NewPassword" autocomplete="new-password">
+            <button type="submit">Change password</button>
+        </form>
+    </div>
+}

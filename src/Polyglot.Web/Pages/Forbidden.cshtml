@@ -1,0 +1,9 @@
+@page "/forbidden"
+@{
+    ViewData["Title"] = "Access denied";
+}
+<div class="card">
+    <h1>Access denied</h1>
+    <p>Your account is not allowed to open this page. Ask an administrator to change your role.</p>
+    <a href="@Url.Content("~/")">Back to home</a>
+</div>

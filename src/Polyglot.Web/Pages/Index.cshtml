@@ -1,0 +1,26 @@
+@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Kododo.Polyglot.Web.Auth
+@attribute [Authorize]
+@inject PolyglotOptions Polyglot
+@{
+    ViewData["Title"] = "Home";
+}
+<div class="card">
+    <h1>Polyglot</h1>
+    <ul class="links">
+        @if (User.IsInRole(nameof(UserRole.Admin)) || User.IsInRole(nameof(UserRole.Editor)))
+        {
+            <li><a href="@($"{Request.PathBase}{Polyglot.GetEditorPath()}/")">Open the translation editor</a></li>
+        }
+        else
+        {
+            <li class="muted">Your account has no access yet. Ask an administrator to grant you a role.</li>
+        }
+        @if (User.IsInRole(nameof(UserRole.Admin)))
+        {
+            <li><a asp-page="/Admin/Users">Manage users</a></li>
+        }
+        <li><a asp-page="/Account">Your account</a></li>
+    </ul>
+</div>

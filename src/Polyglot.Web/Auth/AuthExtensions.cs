@@ -48,6 +48,7 @@ public static class AuthExtensions
 
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<UserService>();
+        services.AddScoped<ApiKeyService>();
 
         // Keys live in the database so that cookies survive restarts and work across replicas.
         services.AddDataProtection()

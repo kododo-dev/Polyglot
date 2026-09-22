@@ -33,14 +33,20 @@ here is built yet.
 ```
 pg_<id>_<secret>
 
-id      8 characters, base62, public
-secret  43 characters, base64url of 32 random bytes
+id      8 characters, lower-case letters and digits, public
+secret  43 characters, letters and digits, about 256 bits
 ```
 
-Example: `pg_7fk2ab91_Zx8Qv...`, shown in full exactly once, at creation.
+Example: `pg_7fk2ab91_Zx8QvR...`, shown in full exactly once, at creation.
 
 - `id` is a public identifier: it is indexed, logged and displayed in the UI, so a key can be
-  recognised and revoked without the secret ever being stored.
+  recognised and revoked without the secret ever being stored. Lower case only, because an identifier
+  gets read off a screen or out of a log, where case is easy to lose.
+- The secret is letters and digits, not base64url, even though base64url would be the obvious encoding
+  for 32 random bytes: its `_` collides with the separator in `pg_<id>_<secret>`, so anything that
+  splits a token on `_` — including the first version of the parser here — breaks on about half the
+  keys. 43 characters out of 62 carry the same entropy. Parsing is by position anyway, so the
+  separator can never be mistaken for token content.
 - The secret is high-entropy random, so the stored verifier is a plain SHA-256 of it — no password
   KDF needed, the same reasoning hosted services apply to their tokens. Compared in constant time.
 - The `pg_` prefix makes keys greppable in logs and recognisable to secret scanners.

@@ -10,6 +10,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -28,6 +30,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(u => u.ExternalSubject).HasMaxLength(256);
             e.HasIndex(u => u.NormalizedUsername).IsUnique();
             e.HasIndex(u => new { u.ExternalIssuer, u.ExternalSubject }).IsUnique();
+        });
+
+        modelBuilder.Entity<ApiKey>(e =>
+        {
+            e.ToTable("api_keys");
+            e.HasKey(k => k.Id);
+            e.Property(k => k.KeyId).HasMaxLength(8).IsRequired();
+            e.Property(k => k.SecretHash).HasMaxLength(32).IsRequired();
+            e.Property(k => k.Name).HasMaxLength(200).IsRequired();
+            e.Property(k => k.Scopes).HasMaxLength(200).IsRequired();
+            e.HasIndex(k => k.KeyId).IsUnique();
         });
 
         modelBuilder.Entity<DataProtectionKey>().ToTable("data_protection_keys");

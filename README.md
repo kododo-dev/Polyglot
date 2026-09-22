@@ -77,8 +77,10 @@ dotnet ef migrations add <Name> --output-dir Data/Migrations
 ## Roadmap
 
 1. ~~Authentication and authorization: local users and OpenID Connect.~~
-2. API keys and a delivery API for consuming apps, plus a client package.
+2. API keys and a delivery API for consuming apps, published as an OpenAPI document to generate
+   clients from — contract in [docs/delivery-api.md](docs/delivery-api.md).
 3. Statuses, history, import and export.
+4. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
 
 ## License
 

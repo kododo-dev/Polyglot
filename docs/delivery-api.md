@@ -1,8 +1,9 @@
 # Delivery API — contract
 
 Design for roadmap item 2: API keys, a read-only delivery API for consuming apps, and an OpenAPI
-document they generate a client from. This document fixes the contract before implementation; nothing
-here is built yet.
+document they generate a client from. The contract was fixed before implementation and is kept in step
+with it: the keys, the `ApiKey` scheme, rate limiting and `GET /api/v1/cultures` are in place; the
+translations endpoints, the admin page and the OpenAPI document are not yet.
 
 ## Goals
 
@@ -101,13 +102,16 @@ Mounted under `/api/v1`, respecting `Polyglot__PathBase`. All responses are `app
 {
   "version": "3f9a1c2d5e7b8a04",
   "defaultCulture": "en",
-  "cultures": ["en", "pl", "de"]
+  "cultures": ["de", "en", "pl"]
 }
 ```
 
-The union of configured `Polyglot__Cultures` and cultures added at runtime
-(`IStore.GetSupportedCulturesAsync`). `defaultCulture` prefers the value persisted by the editor over
-the configured one — the same precedence the editor applies.
+Sorted, so that the payload and its version are deterministic. Read from the live
+`CultureWayOptions`, which is the source the editor itself reads: it already carries the configured
+`Polyglot__Cultures`, the cultures the store persisted in an earlier run, and any added while the
+instance runs, with `defaultCulture` resolved the same way the editor resolves it. One known limit
+comes with it: a culture added on one replica reaches the others only after a restart, because
+CultureWay keeps that list per process — the editor has the same behaviour today.
 
 ### `GET /api/v1/translations`
 
@@ -169,20 +173,25 @@ reaches consuming apps within `SnapshotCacheSeconds` plus the client's own poll 
 
 ## Errors
 
-| Status | When | `type` suffix |
+| Status | When | `type` |
 |---|---|---|
-| `400` | malformed culture code, unknown `fallback` value | `invalid-request` |
-| `401` | missing, malformed, unknown, expired or disabled key | `unauthorized` |
-| `403` | valid key without the required scope | `forbidden` |
-| `404` | unsupported culture | `not-found` |
-| `429` | per-key rate limit exceeded; includes `Retry-After` | `rate-limited` |
+| `400` | malformed culture code, unknown `fallback` value | `urn:polyglot:error:invalid-request` |
+| `401` | missing, malformed, unknown, expired or disabled key | `urn:polyglot:error:unauthorized` |
+| `403` | valid key without the required scope | `urn:polyglot:error:forbidden` |
+| `404` | unsupported culture | `urn:polyglot:error:not-found` |
+| `429` | per-key rate limit exceeded; includes `Retry-After` | `urn:polyglot:error:rate-limited` |
+
+The types are URNs rather than URLs: a client compares them, and a documentation link would rot.
 
 `401` deliberately does not distinguish an unknown key from a disabled one; that difference belongs
 in the logs administrators read, not in the response a caller gets.
 
 Rate limiting: a fixed window per key, `Polyglot__Api__RequestsPerMinute` (default `120`) — generous
-for polling, low enough to bound a misconfigured client. Requests without a valid key are limited per
-client address, the way sign-in already is.
+for polling, low enough to bound a misconfigured client. The window is partitioned by the key
+identifier read straight out of the header, not by the authenticated principal, and the limiter runs
+ahead of authentication. That is what makes a flood of invalid keys cost a rejection rather than a
+database lookup each; anything without a parsable key falls back to a partition per client address,
+the way sign-in already does.
 
 ## Configuration
 

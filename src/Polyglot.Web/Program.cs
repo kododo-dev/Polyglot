@@ -2,6 +2,7 @@ using Kododo.CultureWay;
 using Kododo.CultureWay.PostgreSQL;
 using Kododo.CultureWay.UI;
 using Kododo.Polyglot.Web;
+using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,14 +11,21 @@ var polyglot = builder.Configuration.GetSection(PolyglotOptions.SectionName).Get
                ?? new PolyglotOptions();
 var auth = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>()
            ?? new AuthOptions();
+var api = builder.Configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>()
+          ?? new ApiOptions();
 var connectionString = builder.Configuration.GetConnectionString("Default");
 var cultures = polyglot.GetCultures();
 var editorPath = polyglot.GetEditorPath();
 
 auth.Validate(connectionString);
+api.Validate();
+
+// The API needs keys, which need the admin UI to issue and revoke them.
+var apiEnabled = api.Enabled && auth.Enabled;
 
 builder.Services.AddSingleton(polyglot);
 builder.Services.AddSingleton(auth);
+builder.Services.AddSingleton(api);
 builder.Services.AddHealthChecks();
 
 builder.Services.AddCultureWay(x =>
@@ -31,6 +39,9 @@ builder.Services.AddCultureWay(x =>
 
 if (auth.Enabled)
     builder.Services.AddPolyglotAuth(connectionString!, auth, editorPath);
+
+if (apiEnabled)
+    builder.Services.AddPolyglotApi(api);
 
 var app = builder.Build();
 
@@ -49,11 +60,17 @@ else
 
 await app.InitializeCultureWayAsync();
 
+if (api.Enabled && !auth.Enabled)
+    app.Logger.LogWarning(
+        "The delivery API is not mapped: it needs authentication (Polyglot:Auth:Enabled=true), " +
+        "without which there is no way to issue or revoke an API key.");
+
 if (auth.Enabled)
 {
+    // Ahead of authentication, so that requests carrying an invalid key are limited too.
+    app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
-    app.UseRateLimiter();
 }
 
 app.MapHealthChecks("/health");
@@ -62,6 +79,9 @@ if (auth.Enabled)
     app.MapRazorPages();
 else
     app.MapGet("/", (HttpContext ctx) => Results.Redirect($"{ctx.Request.PathBase}{editorPath}/"));
+
+if (apiEnabled)
+    app.MapPolyglotApi();
 
 var editor = app.UseCultureWay(editorPath);
 if (auth.Enabled)

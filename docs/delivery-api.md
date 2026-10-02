@@ -3,8 +3,8 @@
 Design for roadmap item 2: API keys, a read-only delivery API for consuming apps, and an OpenAPI
 document they generate a client from. The contract was fixed before implementation and is kept in step
 with it: the keys, the `ApiKey` scheme, rate limiting, `GET /api/v1/cultures` and
-`GET /api/v1/translations/{culture}` with its snapshot cache are in place; the admin page and the
-OpenAPI document are not yet.
+`GET /api/v1/translations/{culture}` with its snapshot cache, and the `/admin/api-keys` page are in
+place; the OpenAPI document is not yet.
 
 ## Goals
 

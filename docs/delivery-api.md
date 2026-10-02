@@ -2,8 +2,9 @@
 
 Design for roadmap item 2: API keys, a read-only delivery API for consuming apps, and an OpenAPI
 document they generate a client from. The contract was fixed before implementation and is kept in step
-with it: the keys, the `ApiKey` scheme, rate limiting and `GET /api/v1/cultures` are in place; the
-translations endpoint, the admin page and the OpenAPI document are not yet.
+with it: the keys, the `ApiKey` scheme, rate limiting, `GET /api/v1/cultures` and
+`GET /api/v1/translations/{culture}` with its snapshot cache are in place; the admin page and the
+OpenAPI document are not yet.
 
 ## Goals
 
@@ -227,7 +228,7 @@ the way sign-in already does.
 |---|---|---|
 | `Polyglot__Api__Enabled` | `true` | Delivery API. Requires `Polyglot__Auth__Enabled=true`, which in turn requires a database. |
 | `Polyglot__Api__RequestsPerMinute` | `120` | Requests allowed per key per minute. |
-| `Polyglot__Api__SnapshotCacheSeconds` | `10` | How long a snapshot is reused in process. |
+| `Polyglot__Api__SnapshotCacheSeconds` | `10` | How long a snapshot is reused in process. `0` reads the store on every request. |
 | `Polyglot__Api__OpenApi__Enabled` | `true` | Serves the OpenAPI document at `/openapi/v1.json`, without a key. |
 
 ## Versioning

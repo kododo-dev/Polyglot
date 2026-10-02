@@ -3,7 +3,9 @@ using System.Threading.RateLimiting;
 using Kododo.CultureWay;
 using Kododo.Polyglot.Web.Auth;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Kododo.Polyglot.Web.Api;
 
@@ -24,6 +26,9 @@ public static class ApiExtensions
     public static IServiceCollection AddPolyglotApi(this IServiceCollection services, ApiOptions api)
     {
         services.AddProblemDetails();
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<TranslationSnapshots>();
 
         services.AddAuthentication()
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyScheme, null);
@@ -79,8 +84,83 @@ public static class ApiExtensions
             })
             .WithName("getCultures");
 
+        group.MapGet("/translations/{culture}", async (
+                HttpContext http,
+                string culture,
+                [FromQuery(Name = "namespace")] string[]? namespaces,
+                CultureWayOptions cultures,
+                TranslationSnapshots snapshots) =>
+            {
+                if (!TryLineage(culture, out var lineage))
+                    return Problem(
+                        StatusCodes.Status400BadRequest, ApiProblems.InvalidRequest, "Invalid culture",
+                        $"'{culture}' is not a culture code.");
+
+                var filters = (namespaces ?? [])
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+
+                var invalid = filters.FirstOrDefault(ns => !TranslationNamespaces.IsValid(ns));
+                if (invalid is not null)
+                    return Problem(
+                        StatusCodes.Status400BadRequest, ApiProblems.InvalidRequest, "Invalid namespace",
+                        $"'{invalid}' is not a namespace: it is empty or has an empty segment.");
+
+                // Only the culture and its parents count, not the default culture that closes every
+                // chain: answering an unknown culture with it would turn a typo into silently
+                // default-language pages.
+                var supported = new HashSet<string>(cultures.SupportedCultures, StringComparer.OrdinalIgnoreCase);
+                if (!lineage.Any(supported.Contains))
+                    return Problem(
+                        StatusCodes.Status404NotFound, ApiProblems.NotFound, "Unsupported culture",
+                        $"Neither '{culture}' nor any of its parent cultures is served by this instance.");
+
+                var snapshot = await snapshots.GetAsync(http.RequestAborted);
+                var resolved = snapshot.Resolve(FallbackChain(lineage, cultures.DefaultCulture), filters);
+
+                return ConditionalResponse.Json(http, resolved.Version, resolved.Translations);
+            })
+            .WithName("getTranslations");
+
         return group;
     }
+
+    // The culture and its parents, most specific first: pl-PL, pl.
+    private static bool TryLineage(string culture, out string[] lineage)
+    {
+        lineage = [];
+
+        CultureInfo current;
+        try
+        {
+            current = CultureInfo.GetCultureInfo(culture);
+        }
+        catch (CultureNotFoundException)
+        {
+            return false;
+        }
+
+        var names = new List<string>();
+        while (!string.IsNullOrEmpty(current.Name))
+        {
+            names.Add(current.Name);
+            current = current.Parent;
+        }
+
+        lineage = [.. names];
+        return lineage.Length > 0;
+    }
+
+    // CultureWay's own fallback chain, as its IStringLocalizer walks it: the culture, its parents,
+    // then the default culture.
+    private static string[] FallbackChain(string[] lineage, string defaultCulture)
+        => lineage.Contains(defaultCulture, StringComparer.OrdinalIgnoreCase)
+            ? lineage
+            : [.. lineage, defaultCulture];
+
+    private static IResult Problem(int statusCode, string type, string title, string detail)
+        => Results.Problem(detail: detail, statusCode: statusCode, title: title, type: type);
 
     // Partitioned by the key identifier taken straight from the header rather than from the
     // authenticated principal, so that a flood of invalid keys is bounded as well.

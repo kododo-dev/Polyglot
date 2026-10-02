@@ -3,7 +3,7 @@
 Design for roadmap item 2: API keys, a read-only delivery API for consuming apps, and an OpenAPI
 document they generate a client from. The contract was fixed before implementation and is kept in step
 with it: the keys, the `ApiKey` scheme, rate limiting and `GET /api/v1/cultures` are in place; the
-translations endpoints, the admin page and the OpenAPI document are not yet.
+translations endpoint, the admin page and the OpenAPI document are not yet.
 
 ## Goals
 
@@ -113,40 +113,63 @@ instance runs, with `defaultCulture` resolved the same way the editor resolves i
 comes with it: a culture added on one replica reaches the others only after a restart, because
 CultureWay keeps that list per process — the editor has the same behaviour today.
 
-### `GET /api/v1/translations`
-
-Every culture in one snapshot, for an app that serves several languages.
-
-```json
-{
-  "version": "a71b0ce4425d9f18",
-  "defaultCulture": "en",
-  "cultures": {
-    "en": { "Greeting": "Hello", "Validation.Required": "Required" },
-    "pl": { "Greeting": "Czesc" }
-  }
-}
-```
-
 ### `GET /api/v1/translations/{culture}`
 
-One culture, for an app that only needs the active one.
+The translations an app needs to render in one culture, optionally narrowed to some namespaces:
+`/api/v1/translations/pl?namespace=Checkout&namespace=Common`.
 
 ```json
 {
-  "version": "c02f4419ab7d3e65",
-  "culture": "pl",
-  "translations": { "Greeting": "Czesc" }
+  "Checkout.Pay": "Zapłać",
+  "Checkout.Summary.Total": "Razem",
+  "Common.Cancel": "Anuluj"
 }
 ```
 
-- `404` when the culture is not among the supported ones. A supported culture with no translations
-  returns `200` and an empty object — a real, if empty, answer.
-- `?fallback=default` fills keys missing in `{culture}` with the default culture's values, for
-  clients that do not implement fallback themselves. The default is `?fallback=none`.
+The body is the translations and nothing else, so an app hands it straight to its i18n library. The
+rest travels outside it: the version is the `ETag` header (see
+[Caching](#caching-and-change-detection)), and the culture and namespaces are the ones the caller
+asked for, so echoing them back would add nothing.
 
-Keys absent from a culture are absent from the object; `null` values never appear. Entries are sorted
-by key, so the payload — and therefore the version — is deterministic.
+**Culture.** Required, and the culture fallback is Polyglot's, not the caller's: every key is resolved
+along the chain CultureWay's own `IStringLocalizer` uses — the culture, then its parents, then the
+default culture (`pl-PL` → `pl` → `en`). The response therefore holds every key that has a value
+anywhere in that chain, without saying which culture a value came from; an app gets what the
+localizer would have given it and implements no fallback of its own. A key is absent only when no
+culture in the chain has it, and the app shows the key itself, as the localizer does.
+
+- `404` when neither the culture nor any of its parents is supported. Answering with the default
+  culture instead would turn a typo such as `xx` into silently English pages.
+- A supported culture with no translations of its own still returns `200` with whatever the chain
+  provides — a real answer.
+
+**Namespaces.** CultureWay has no namespace entity: a key's namespace is everything before its last
+dot, and the editor builds its tree from those prefixes. `namespace` follows the editor's filter, so
+`namespace=Checkout` selects keys whose namespace is `Checkout` or lies under it (`Checkout.Pay`,
+`Checkout.Summary.Total`).
+
+- Optional and repeatable; the response holds the union. Without it, the whole culture is returned. A
+  page usually needs its own namespace and a shared one, and one request is simpler than two.
+- A namespace with no keys returns `200` and an empty object, not `404`: a namespace exists only while
+  it has keys, so deleting the last one must not break the app asking for it.
+- `400` for a malformed namespace — empty, or with an empty segment (`.Checkout`, `A..B`).
+- Keys without a dot (the editor's "(root)") are returned only without a filter. Selecting them alone
+  can be added later without breaking anything.
+
+**Payload.** Keys are full keys in a flat map — not stripped of the namespace and not nested. Stripping
+would collide when several namespaces are requested, and the app looks keys up by their full name
+anyway. Nesting cannot express CultureWay's keys, where one key may be the namespace of another —
+`Checkout.Pay` and `Checkout.Pay.Tooltip` may both exist, and `Pay` cannot be a string and an object
+at once. CultureWay does not forbid this, and the editor invites it by prefilling a new key with the
+selected namespace. A nested-JSON library such as i18next reads the flat map with
+`keySeparator: false`. `null` values never appear.
+Values are returned as stored, without processing: the API neither imposes nor converts any
+placeholder syntax. Entries are sorted by key, so the payload — and therefore the version — is
+deterministic.
+
+A bare map cannot grow fields, so this response is the one exception to `/api/v1` being additive
+(see [Versioning](#versioning)): anything else it ever needs to say goes into a header, or into
+`/api/v2`.
 
 ### Composition
 
@@ -156,17 +179,22 @@ the delivery API must not disagree with the editor if one is ever added.
 
 ## Caching and change detection
 
-- `version` is SHA-256 over the resource's canonical content (sorted `culture`, `key`, `value`
-  triples), first 16 hex characters.
-- The same value is the strong ETag: `ETag: "a71b0ce4425d9f18"`.
+- The version is SHA-256 over the response's canonical content (sorted entries), first 16 hex
+  characters. `GET /api/v1/cultures` also carries it in the body as `version`; the translations
+  response carries it only in the header.
+- It is sent as the strong ETag: `ETag: "a71b0ce4425d9f18"`.
 - `If-None-Match` with a matching value returns `304` and no body.
 - `Cache-Control: no-cache` — always revalidate, never let a shared proxy serve a stale snapshot. The
   cheap path is the `304`, not a freshness guess.
-- Every resource carries its own version, so a change in `de` does not invalidate a client polling
-  `pl`.
+- Every response carries its own version, computed after the fallback chain and the namespace filter
+  are applied: a change in `de` does not invalidate a client polling `pl`, nor a change in `Admin` one
+  polling `Checkout`. A change in the default culture does invalidate every culture that falls back to
+  it, because their responses really change.
 
 Building a snapshot per request would mean selecting every translation on every poll, so Polyglot
-keeps one in process with a short TTL: `Polyglot__Api__SnapshotCacheSeconds` (default `10`). A TTL
+keeps one in process — every culture, unfiltered — and resolves and filters each response from it in
+memory, memoising the result per culture and namespace set for the snapshot's lifetime. The snapshot
+lives for a short TTL: `Polyglot__Api__SnapshotCacheSeconds` (default `10`). A TTL
 rather than invalidation on write, because with several replicas a write handled by one replica
 cannot invalidate the others, and the editor is the only writer. The visible effect is that an edit
 reaches consuming apps within `SnapshotCacheSeconds` plus the client's own poll interval.
@@ -175,10 +203,10 @@ reaches consuming apps within `SnapshotCacheSeconds` plus the client's own poll 
 
 | Status | When | `type` |
 |---|---|---|
-| `400` | malformed culture code, unknown `fallback` value | `urn:polyglot:error:invalid-request` |
+| `400` | malformed culture code or namespace | `urn:polyglot:error:invalid-request` |
 | `401` | missing, malformed, unknown, expired or disabled key | `urn:polyglot:error:unauthorized` |
 | `403` | valid key without the required scope | `urn:polyglot:error:forbidden` |
-| `404` | unsupported culture | `urn:polyglot:error:not-found` |
+| `404` | neither the culture nor any of its parents is supported | `urn:polyglot:error:not-found` |
 | `429` | per-key rate limit exceeded; includes `Retry-After` | `urn:polyglot:error:rate-limited` |
 
 The types are URNs rather than URLs: a client compares them, and a documentation link would rot.
@@ -205,6 +233,7 @@ the way sign-in already does.
 ## Versioning
 
 `/api/v1` is additive only: new fields and endpoints may appear, existing fields keep their meaning.
+The translations response is a bare map and has no room for new fields; it can only gain headers.
 A breaking change means `/api/v2` served alongside v1, with its own OpenAPI document at
 `/openapi/v2.json`. Field and `operationId` names are part of the contract: renaming one breaks every
 generated client, so it counts as a new version.
@@ -224,13 +253,14 @@ Instead of shipping a client, Polyglot publishes its contract and lets consumers
 
 What the document has to get right to produce usable clients:
 
-- An explicit `operationId` on every endpoint (`getCultures`, `getTranslations`,
-  `getCultureTranslations`) — generators derive method names from it, and an accidental rename is a
-  breaking change for every generated client.
-- Named response schemas backed by real DTO records (`CulturesResponse`, `TranslationsResponse`,
-  `CultureTranslationsResponse`), never anonymous inline objects, so generated models get stable
-  names. The key/value maps are declared as `additionalProperties: string`, which generators render as
-  `Dictionary<string, string>`, `map[string]string`, `Record<string, string>`.
+- An explicit `operationId` on every endpoint (`getCultures`, `getTranslations`) — generators derive
+  method names from it, and an accidental rename is a breaking change for every generated client.
+- A named response schema backed by a real DTO record for `getCultures` (`CulturesResponse`), never
+  an anonymous inline object, so the generated model gets a stable name. `getTranslations` returns an
+  object with `additionalProperties: string`, which generators render as `Dictionary<string, string>`,
+  `map[string]string`, `Record<string, string>` — a plain map type, not a model.
+- `namespace` declared as an array query parameter (`style: form`, `explode: true`), so a generated
+  client takes a list of namespaces rather than a string the caller has to assemble.
 - A `securityScheme` of type `apiKey` in header `X-Api-Key`, applied to every operation, so a
   generated client exposes the key as configuration instead of leaving callers to add the header.
 - Documented error responses (`400`, `401`, `403`, `404`, `429`) with `application/problem+json` and a
@@ -263,8 +293,20 @@ iteration: it would also need a public cache-reload hook in CultureWay, whose `T
 
 ## Deliberate limits
 
-Two things were considered and left out on purpose, both recorded here so they are not re-litigated
-by accident:
+These were considered and left out on purpose, all recorded here so they are not re-litigated by
+accident:
+
+- **No endpoint returning every culture at once.** A consuming app renders a page in one culture at
+  a time; an app serving several languages asks once per culture, and each answer keeps its own
+  version.
+- **No `fallback` parameter.** How a missing translation is resolved is Polyglot's policy, the same
+  chain the localizer applies, not something a reader chooses per request. Letting callers switch it
+  off would let two apps disagree about what the same page says.
+- **Namespaces in the query, not the path.** `/translations/{culture}/{namespaces}` reads nicer, but a
+  path parameter cannot be optional in OpenAPI (two routes and two operations instead of one), a list
+  in a path is a mini-language every client must assemble and escape, while a repeated query parameter
+  becomes a plain array in a generated client, and CultureWay keys may contain `/` — which reverse
+  proxies mangle or reject in a path segment as `%2F` — or `,`.
 
 - **No key seeded from configuration.** The delivery API requires authentication to be enabled, as
   described under [Management](#management). Adding `Polyglot__Api__BootstrapKey` later is purely

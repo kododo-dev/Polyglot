@@ -44,12 +44,12 @@
                 <tr>
                     <td>
                         @key.Name <span class="tag">@Model.Status(key)</span><br>
-                        <code class="muted">@(ApiKeyService.TokenPrefix + key.KeyId)_…</code>
+                        <code class="muted">@(ApiKeyService.TokenPrefix + key.KeyId)_...</code>
                         <span class="muted">@key.Scopes</span>
                     </td>
                     <td>@ApiKeysModel.Format(key.CreatedAt)</td>
                     <td>@ApiKeysModel.Format(key.LastUsedAt)</td>
-                    <td>@(key.ExpiresAt is null ? "never" : ApiKeysModel.Format(key.ExpiresAt))</td>
+                    <td>@ApiKeysModel.Format(key.ExpiresAt)</td>
                     <td>
                         <form method="post" asp-page-handler="Disabled">
                             <input type="hidden" name="id" value="@key.Id">
@@ -71,7 +71,7 @@
 <div class="card">
     <h2>Create a key</h2>
     <form method="post" asp-page-handler="Create">
-        <label for="name">Name — what the key is for, e.g. shop-frontend-prod</label>
+        <label for="name">Name (what the key is for, e.g. shop-frontend-prod)</label>
         <input id="name" type="text" asp-for="Input.Name" maxlength="@ApiKeyService.MaxNameLength" autocomplete="off">
         <label for="validThrough">Valid through (UTC, optional)</label>
         <input id="validThrough" type="date" asp-for="Input.ValidThrough">

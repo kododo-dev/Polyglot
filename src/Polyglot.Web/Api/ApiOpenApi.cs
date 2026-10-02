@@ -58,7 +58,7 @@ public static class ApiOpenApi
             });
 
             // ASP.NET Core's web JSON defaults read numbers from strings too, so an int becomes
-            // "integer or numeric string" — a union generators turn into an untyped field. Only
+            // "integer or numeric string", a union that generators turn into an untyped field. Only
             // ProblemDetails.status is affected, and Polyglot only ever writes it as a number.
             o.AddSchemaTransformer((schema, context, _) =>
             {

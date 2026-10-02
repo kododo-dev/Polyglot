@@ -12,7 +12,7 @@ namespace Kododo.Polyglot.Web.Auth;
 /// </summary>
 public sealed class ApiKeyService(AppDbContext db)
 {
-    /// <summary>Read every translation in the instance — the only scope so far.</summary>
+    /// <summary>Read every translation in the instance. The only scope so far.</summary>
     public const string ReadScope = "translations:read";
 
     public const string TokenPrefix = "pg_";
@@ -42,7 +42,7 @@ public sealed class ApiKeyService(AppDbContext db)
         => await db.ApiKeys.OrderBy(k => k.Name).ThenBy(k => k.CreatedAt).ToListAsync(ct);
 
     /// <summary>
-    /// Issues a key. The returned token is the only copy that will ever exist — show it once and
+    /// Issues a key. The returned token is the only copy that will ever exist. Show it once and
     /// forget it.
     /// </summary>
     public async Task<(ApiKey? Key, string Token, string[] Errors)> CreateAsync(
@@ -89,7 +89,7 @@ public sealed class ApiKeyService(AppDbContext db)
 
     /// <summary>
     /// Returns the key the token belongs to, or null when the token is malformed, unknown, tampered
-    /// with, disabled or expired — a caller is not told which.
+    /// with, disabled or expired. The caller is not told which.
     /// </summary>
     /// <param name="now">The instant the request counts as happening at, for expiry and last use.</param>
     public async Task<ApiKey?> ValidateAsync(string token, DateTimeOffset now, CancellationToken ct = default)
@@ -176,7 +176,7 @@ public sealed class ApiKeyService(AppDbContext db)
         throw new InvalidOperationException("Could not generate a unique API key identifier.");
     }
 
-    // The secret is 32 random bytes, so a single SHA-256 is enough — there is nothing to brute-force
-    // that a password KDF would slow down.
+    // The secret carries about 256 random bits, so a single SHA-256 is enough. There is nothing to
+    // brute-force that a password KDF would slow down.
     private static byte[] HashSecret(string secret) => SHA256.HashData(Encoding.UTF8.GetBytes(secret));
 }

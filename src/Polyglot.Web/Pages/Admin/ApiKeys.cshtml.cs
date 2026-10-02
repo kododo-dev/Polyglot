@@ -92,5 +92,5 @@ public class ApiKeysModel(ApiKeyService keys, ApiOptions api) : PageModel
         => key.IsDisabled ? "disabled" : key.IsActive(Now) ? "active" : "expired";
 
     public static string Format(DateTimeOffset? at)
-        => at is { } value ? value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") + " UTC" : "—";
+        => at is { } value ? value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") + " UTC" : "never";
 }

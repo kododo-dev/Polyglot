@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Kododo.CultureWay;
@@ -29,6 +30,9 @@ public static class ApiExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<TranslationSnapshots>();
+
+        if (api.OpenApi.Enabled)
+            services.AddPolyglotOpenApi();
 
         services.AddAuthentication()
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyScheme, null);
@@ -67,7 +71,11 @@ public static class ApiExtensions
     {
         var group = app.MapGroup(BasePath)
             .RequireAuthorization(ApiPolicies.Read)
-            .RequireRateLimiting(RateLimitPolicy);
+            .RequireRateLimiting(RateLimitPolicy)
+            .WithTags(ApiOpenApi.Tag)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/cultures", (HttpContext http, CultureWayOptions cultures) =>
             {
@@ -82,12 +90,17 @@ public static class ApiExtensions
                 return ConditionalResponse.Json(
                     http, version, new CulturesResponse(version, cultures.DefaultCulture, supported));
             })
-            .WithName("getCultures");
+            .WithName("getCultures")
+            .WithSummary("The cultures this instance serves")
+            .Produces<CulturesResponse>()
+            .Produces(StatusCodes.Status304NotModified);
 
         group.MapGet("/translations/{culture}", async (
                 HttpContext http,
-                string culture,
-                [FromQuery(Name = "namespace")] string[]? namespaces,
+                [Description("A culture code such as pl or pl-PL.")] string culture,
+                [FromQuery(Name = "namespace")]
+                [Description("Narrows the response to keys in this namespace or under it; repeatable, the union is returned.")]
+                string[]? namespaces,
                 CultureWayOptions cultures,
                 TranslationSnapshots snapshots) =>
             {
@@ -121,7 +134,15 @@ public static class ApiExtensions
 
                 return ConditionalResponse.Json(http, resolved.Version, resolved.Translations);
             })
-            .WithName("getTranslations");
+            .WithName("getTranslations")
+            .WithSummary("The translations of one culture")
+            .WithDescription(
+                "Every key resolved along the culture's fallback chain (the culture, its parents, then the " +
+                "default culture), optionally narrowed to namespaces. A flat map of full keys to values.")
+            .Produces<IReadOnlyDictionary<string, string>>()
+            .Produces(StatusCodes.Status304NotModified)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
     }

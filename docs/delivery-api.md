@@ -3,8 +3,8 @@
 Design for roadmap item 2: API keys, a read-only delivery API for consuming apps, and an OpenAPI
 document they generate a client from. The contract was fixed before implementation and is kept in step
 with it: the keys, the `ApiKey` scheme, rate limiting, `GET /api/v1/cultures` and
-`GET /api/v1/translations/{culture}` with its snapshot cache, and the `/admin/api-keys` page are in
-place; the OpenAPI document is not yet.
+`GET /api/v1/translations/{culture}` with its snapshot cache, the `/admin/api-keys` page and the
+OpenAPI document are all in place.
 
 ## Goals
 
@@ -270,10 +270,16 @@ What the document has to get right to produce usable clients:
   Several generators handle a bodyless `304` awkwardly, so conditional requests are documented but a
   client that ignores them still works — it just transfers more.
 
-The document is also generated at build time (`Microsoft.Extensions.ApiDescription.Server`) and
-committed as `docs/openapi/v1.json`, so every contract change shows up in a review diff. CI
-regenerates it and fails when the committed copy is stale — the same reason migrations are committed
-rather than inferred.
+The document is also committed as `docs/openapi/v1.json`, so every contract change shows up in a
+review diff — the same reason migrations are committed rather than inferred. A test fetches the
+document from the running app and fails when the committed copy differs, so CI fails on a stale copy;
+running the tests with `POLYGLOT_UPDATE_OPENAPI=1` rewrites it. Build-time generation
+(`Microsoft.Extensions.ApiDescription.Server`) was the first plan, but it runs `Program` without a
+database, where authentication refuses to start and the delivery API is never mapped.
+
+The document has no `servers`: a client is pointed at its own instance, and the committed copy must
+not depend on the host it was generated on. Generators also need the operations' tag, `Delivery`,
+from which they name the client class (`DeliveryApi`).
 
 An interactive UI (Scalar, Swagger UI) is not part of ASP.NET Core's OpenAPI support and stays out of
 scope; the document URL is all that generation needs.

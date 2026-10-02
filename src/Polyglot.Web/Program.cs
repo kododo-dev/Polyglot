@@ -81,7 +81,14 @@ else
     app.MapGet("/", (HttpContext ctx) => Results.Redirect($"{ctx.Request.PathBase}{editorPath}/"));
 
 if (apiEnabled)
+{
     app.MapPolyglotApi();
+    if (api.OpenApi.Enabled)
+    {
+        app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
+        app.MapOpenApi("/openapi/{documentName}.yaml").AllowAnonymous();
+    }
+}
 
 var editor = app.UseCultureWay(editorPath);
 if (auth.Enabled)

@@ -20,6 +20,8 @@ public sealed class ApiOptions
     /// </summary>
     public int SnapshotCacheSeconds { get; set; } = 10;
 
+    public OpenApiDocumentOptions OpenApi { get; set; } = new();
+
     public void Validate()
     {
         if (RequestsPerMinute <= 0)
@@ -27,4 +29,11 @@ public sealed class ApiOptions
         if (SnapshotCacheSeconds < 0)
             throw new InvalidOperationException("Polyglot__Api__SnapshotCacheSeconds must not be negative.");
     }
+}
+
+/// <summary>The OpenAPI document of the delivery API, read from <c>Polyglot:Api:OpenApi</c>.</summary>
+public sealed class OpenApiDocumentOptions
+{
+    /// <summary>Serves <c>/openapi/v1.json</c> and <c>/openapi/v1.yaml</c>, without an API key: the schema is not a secret.</summary>
+    public bool Enabled { get; set; } = true;
 }

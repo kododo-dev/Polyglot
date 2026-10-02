@@ -9,6 +9,7 @@
         <PackageReference Include="Kododo.CultureWay.UI" />
         <PackageReference Include="Kododo.CultureWay.PostgreSQL" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

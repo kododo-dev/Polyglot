@@ -1,8 +1,8 @@
 # Polyglot
 
-Self-hosted translation management for .NET. A standalone web app built on the [CultureWay](https://github.com/kododo-dev/CultureWay) packages: edit translations in a web UI with sign-in and roles, bring your own PostgreSQL, run it as a Docker image.
+Self-hosted translation management for .NET, built on the [CultureWay](https://github.com/kododo-dev/CultureWay) packages. Translations are edited in a web UI with sign-in and roles, and apps read them through a read-only API. It runs as a Docker image on top of your own PostgreSQL.
 
-> Early development. The editor is protected by sign-in, but there is no API for consuming apps yet.
+> Early development.
 
 ## Quick start
 
@@ -60,6 +60,35 @@ Any OIDC provider works (Keycloak, Entra ID, Authentik, Google, ...). The app us
 
 Users are created on their first sign-in. To use OIDC only, set `Polyglot__Auth__Local__Enabled=false` together with `AdminGroup` (so that someone can administer the instance).
 
+### Delivery API
+
+A read-only HTTP API from which consuming apps fetch their translations. It authenticates with API keys, which administrators issue at `/admin/api-keys`. A new key is shown once, when it is created. Requires authentication to be enabled.
+
+```bash
+curl -H "X-Api-Key: pg_7fk2ab91_..." https://polyglot.example.com/api/v1/cultures
+curl -H "X-Api-Key: pg_7fk2ab91_..." "https://polyglot.example.com/api/v1/translations/pl?namespace=Checkout&namespace=Common"
+```
+
+`GET /api/v1/translations/{culture}` returns a flat map of full keys to values, for example `{"Checkout.Pay": "Zapłać"}`. Every key is resolved along the same chain CultureWay's `IStringLocalizer` uses: the culture, then its parents, then the default culture. `namespace` is optional and can be repeated. It selects keys in that namespace or under it, as the editor's namespace filter does.
+
+Responses have an `ETag`. Send it back as `If-None-Match` and the API answers `304` when nothing has changed. An edit reaches consuming apps within `SnapshotCacheSeconds` plus their own poll interval.
+
+There is no client library. To get a client, generate one from the OpenAPI 3.0 document at `/openapi/v1.json` (also available as `.yaml`). It is served without a key, and a copy is in [docs/openapi/v1.json](docs/openapi/v1.json).
+
+```bash
+npx @openapitools/openapi-generator-cli generate \
+  -i https://polyglot.example.com/openapi/v1.json -g typescript-fetch -o ./polyglot-client
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `Polyglot__Api__Enabled` | `true` | The delivery API. Not mapped when authentication is disabled, because there is then no way to issue or revoke a key. |
+| `Polyglot__Api__RequestsPerMinute` | `120` | Requests allowed per key per minute; requests without a usable key are counted per client address. Excess requests get `429` with `Retry-After`. |
+| `Polyglot__Api__SnapshotCacheSeconds` | `10` | How long the API reuses one read of all translations. `0` reads the database on every request. |
+| `Polyglot__Api__OpenApi__Enabled` | `true` | Serves the OpenAPI document. |
+
+Design notes: [docs/delivery-api.md](docs/delivery-api.md).
+
 ## Development
 
 ```bash
@@ -74,11 +103,17 @@ cd src/Polyglot.Web
 dotnet ef migrations add <Name> --output-dir Data/Migrations
 ```
 
+A test fails when [docs/openapi/v1.json](docs/openapi/v1.json) differs from the document the app serves. After changing the API, regenerate the file and commit it:
+
+```bash
+POLYGLOT_UPDATE_OPENAPI=1 dotnet test src/Polyglot.slnx --filter OpenApiTests
+```
+
 ## Roadmap
 
 1. ~~Authentication and authorization: local users and OpenID Connect.~~
-2. API keys and a delivery API for consuming apps, published as an OpenAPI document to generate
-   clients from — contract in [docs/delivery-api.md](docs/delivery-api.md).
+2. ~~API keys and a delivery API for consuming apps, with an OpenAPI document for generating
+   clients ([docs/delivery-api.md](docs/delivery-api.md)).~~
 3. Statuses, history, import and export.
 4. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
 

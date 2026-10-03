@@ -158,8 +158,11 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
 
         Assert.Equal("Polyglot", settings.GetProperty("title").GetString());
         Assert.Equal(
-            ["/admin/users", "/admin/api-keys"],
+            ["/", "/translations/", "/admin/users", "/admin/api-keys"],
             settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+        Assert.Equal(
+            ["home", "translations", "users", "key"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
         Assert.Equal("/logout", settings.GetProperty("user").GetProperty("signOutUrl").GetString());
         Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
     }
@@ -175,7 +178,10 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var settings = await EditorSettingsAsync(client);
         var add = await client.PostAsJsonAsync("/translations/api/AddCulture", new { culture = "fr" });
 
-        Assert.Empty(settings.GetProperty("links").EnumerateArray());
+        // Only the editor itself: no overview or admin pages.
+        Assert.Equal(
+            ["/translations/"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
         Assert.Equal("erin", settings.GetProperty("user").GetProperty("name").GetString());
         Assert.False(settings.GetProperty("canManageCultures").GetBoolean());
         Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);

@@ -1,3 +1,4 @@
+@using Kododo.CultureWay.UI
 @using Kododo.Polyglot.Web.Auth
 @using Kododo.Polyglot.Web.Pages.Shared
 @using System.Security.Claims
@@ -7,8 +8,10 @@
     var bare = ViewData["Bare"] is true;
     var currentPage = ViewContext.RouteData.Values["page"] as string;
     string? Current(string page) => currentPage == page ? "page" : null;
-    var canEdit = User.IsInRole(nameof(UserRole.Admin)) || User.IsInRole(nameof(UserRole.Editor));
-    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+    var links = EditorIntegration.Links(Context, Polyglot);
+    // The same rule as the editor's: a link is current when it points at this path.
+    static string Trim(string path) => path.TrimEnd('/') is { Length: > 0 } p ? p : "/";
+    bool IsCurrent(string url) => Trim(url) == Trim($"{Context.Request.PathBase}{Context.Request.Path}");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -42,30 +45,29 @@ else
                 <a class="brand" href="~/">Polyglot</a>
                 <partial name="_ThemeToggle" />
             </div>
-            <nav class="nav">
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <a class="nav-item" href="~/" aria-current="@Current("/Index")">@Icons.Get("home") Overview</a>
-                    @if (canEdit)
-                    {
-                        <a class="nav-item" href="@($"{Context.Request.PathBase}{Polyglot.GetEditorPath()}/")">@Icons.Get("globe") Translations</a>
-                    }
-                    @if (isAdmin)
-                    {
-                        <div class="nav-label">Administration</div>
-                        <a class="nav-item" asp-page="/Admin/Users" aria-current="@Current("/Admin/Users")">@Icons.Get("users") Users</a>
-                        <a class="nav-item" asp-page="/Admin/ApiKeys" aria-current="@Current("/Admin/ApiKeys")">@Icons.Get("key") API keys</a>
-                    }
-                }
-            </nav>
+            @* The editor keeps its namespaces up here; these pages have nothing to put in their place. *@
+            <div class="sidebar-fill"></div>
             @if (User.Identity?.IsAuthenticated == true)
             {
-                <div class="sidebar-foot">
-                    @Icons.Get("user")
-                    <a class="user" asp-page="/Account" aria-current="@Current("/Account")">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
-                    <form method="post" asp-page="/Logout">
-                        <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">@Icons.Get("logout")</button>
-                    </form>
+                @* Same links, icons and order as at the bottom of the editor's side menu (EditorIntegration.Links). *@
+                <div class="host-menu">
+                    @if (links.Count > 0)
+                    {
+                        <nav class="nav" aria-label="Pages">
+                            @foreach (var link in links)
+                            {
+                                <a class="nav-item" href="@link.Url" aria-current="@(IsCurrent(link.Url) ? "page" : null)">@Icons.Get(link.Icon ?? "arrow-right") @link.Label</a>
+                            }
+                        </nav>
+                        <hr class="host-divider">
+                    }
+                    <div class="user-row">
+                        @Icons.Get("user")
+                        <a class="user" asp-page="/Account" aria-current="@Current("/Account")">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
+                        <form method="post" asp-page="/Logout">
+                            <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">@Icons.Get("logout")</button>
+                        </form>
+                    </div>
                 </div>
             }
         </aside>

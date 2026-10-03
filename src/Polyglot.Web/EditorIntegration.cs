@@ -5,8 +5,8 @@ using Kododo.Polyglot.Web.Data;
 namespace Kododo.Polyglot.Web;
 
 /// <summary>
-/// Makes the CultureWay editor part of Polyglot: its title, links to the admin pages, the signed-in
-/// user, and who may add or delete languages.
+/// Makes the CultureWay editor part of Polyglot: its title, the menu links, the signed-in user, and
+/// who may add or delete languages.
 /// </summary>
 public static class EditorIntegration
 {
@@ -17,7 +17,7 @@ public static class EditorIntegration
         if (!authEnabled)
             return;
 
-        editor.Links = Links;
+        editor.Links = ctx => Links(ctx, polyglot);
         editor.User = ctx => ctx.User.Identity?.IsAuthenticated == true
             ? new EditorUser(ctx.User.FindFirstValue("display_name") ?? ctx.User.Identity.Name ?? "")
             {
@@ -29,13 +29,28 @@ public static class EditorIntegration
         editor.CanManageCultures = ctx => ctx.User.IsInRole(nameof(UserRole.Admin));
     }
 
-    private static IEnumerable<EditorLink> Links(HttpContext ctx)
+    /// <summary>
+    /// The side menu's links, shared by the editor and Polyglot's own pages so both list the same
+    /// pages in the same order.
+    /// </summary>
+    public static IReadOnlyList<EditorLink> Links(HttpContext ctx, PolyglotOptions polyglot)
     {
-        if (!ctx.User.IsInRole(nameof(UserRole.Admin)))
-            yield break;
-
+        var isAdmin = ctx.User.IsInRole(nameof(UserRole.Admin));
+        var isEditor = ctx.User.IsInRole(nameof(UserRole.Editor));
         var pathBase = ctx.Request.PathBase;
-        yield return new EditorLink("Users", $"{pathBase}/admin/users");
-        yield return new EditorLink("API keys", $"{pathBase}/admin/api-keys");
+        var links = new List<EditorLink>();
+
+        // Editors are sent from the overview straight to the editor, so only admins get the link.
+        if (isAdmin)
+            links.Add(new EditorLink("Overview", $"{pathBase}/") { Icon = EditorLinkIcons.Home });
+        if (isAdmin || isEditor)
+            links.Add(new EditorLink("Translations", $"{pathBase}{polyglot.GetEditorPath()}/") { Icon = EditorLinkIcons.Translations });
+        if (isAdmin)
+        {
+            links.Add(new EditorLink("Users", $"{pathBase}/admin/users") { Icon = EditorLinkIcons.Users });
+            links.Add(new EditorLink("API keys", $"{pathBase}/admin/api-keys") { Icon = EditorLinkIcons.Key });
+        }
+
+        return links;
     }
 }

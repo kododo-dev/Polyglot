@@ -8,7 +8,7 @@
 @section Actions {
     @if (isAdmin)
     {
-        <a class="btn btn-primary" href="@Model.EditorUrl">@Icons.Get("globe") Open the editor</a>
+        <a class="btn btn-primary" href="@Model.EditorUrl">@Icons.Get("translations") Open the editor</a>
     }
 }
 @if (!isAdmin)
@@ -25,7 +25,7 @@ else
 {
     <div class="tiles">
         <a class="tile" href="@Model.EditorUrl">
-            <span class="tile-label">@Icons.Get("globe") Languages</span>
+            <span class="tile-label">@Icons.Get("translations") Languages</span>
             <span class="tile-value">@Model.Cultures.Count</span>
             <span class="tile-note">@string.Join(", ", Model.Cultures) · default @Model.DefaultCulture</span>
         </a>

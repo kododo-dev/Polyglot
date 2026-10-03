@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
@@ -126,6 +127,58 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
             new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await CallEditorApiAsync(client)).StatusCode);
+    }
+
+    [Fact]
+    public async Task SignOut_FromTheEditor_NeedsNoAntiforgeryToken()
+    {
+        var client = NewClient(await CreateAppAsync());
+        await LoginAsync(client, "admin", AdminPassword);
+
+        var logout = await client.PostAsync("/logout", new FormUrlEncodedContent([]));
+
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await CallEditorApiAsync(client)).StatusCode);
+    }
+
+    private static async Task<JsonElement> EditorSettingsAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/translations/api/GetEditorSettings", new { });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    [Fact]
+    public async Task EditorSettings_ForAdmin_LinkTheAdminPagesAndAllowLanguageChanges()
+    {
+        var client = NewClient(await CreateAppAsync());
+        await LoginAsync(client, "admin", AdminPassword);
+
+        var settings = await EditorSettingsAsync(client);
+
+        Assert.Equal("Polyglot", settings.GetProperty("title").GetString());
+        Assert.Equal(
+            ["/admin/users", "/admin/api-keys"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+        Assert.Equal("/logout", settings.GetProperty("user").GetProperty("signOutUrl").GetString());
+        Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
+    }
+
+    [Fact]
+    public async Task EditorRole_CannotChangeLanguages()
+    {
+        var factory = await CreateAppAsync();
+        await CreateUserAsync(factory, "erin", "erin-password-1", UserRole.Editor);
+        var client = NewClient(factory);
+        await LoginAsync(client, "erin", "erin-password-1");
+
+        var settings = await EditorSettingsAsync(client);
+        var add = await client.PostAsJsonAsync("/translations/api/AddCulture", new { culture = "fr" });
+
+        Assert.Empty(settings.GetProperty("links").EnumerateArray());
+        Assert.Equal("erin", settings.GetProperty("user").GetProperty("name").GetString());
+        Assert.False(settings.GetProperty("canManageCultures").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);
     }
 
     [Fact]

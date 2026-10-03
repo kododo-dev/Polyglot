@@ -32,7 +32,7 @@ builder.Services.AddCultureWay(x =>
 {
     x.Options.SupportedCultures = cultures;
     x.Options.DefaultCulture = polyglot.DefaultCulture.Trim().Length > 0 ? polyglot.DefaultCulture.Trim() : cultures[0];
-    x.AddEditor();
+    x.AddEditor(editor => EditorIntegration.Configure(editor, polyglot, auth.Enabled));
     if (!string.IsNullOrWhiteSpace(connectionString))
         x.UsePostgreSQL(connectionString);
 });

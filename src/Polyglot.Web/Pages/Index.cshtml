@@ -1,26 +1,61 @@
 @page "/"
-@using Microsoft.AspNetCore.Authorization
-@using Kododo.Polyglot.Web.Auth
-@attribute [Authorize]
-@inject PolyglotOptions Polyglot
+@model IndexModel
+@using Kododo.Polyglot.Web.Pages.Shared
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Overview";
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
 }
-<div class="card">
-    <h1>Polyglot</h1>
-    <ul class="links">
-        @if (User.IsInRole(nameof(UserRole.Admin)) || User.IsInRole(nameof(UserRole.Editor)))
-        {
-            <li><a href="@($"{Request.PathBase}{Polyglot.GetEditorPath()}/")">Open the translation editor</a></li>
-        }
-        else
-        {
-            <li class="muted">Your account has no access yet. Ask an administrator to grant you a role.</li>
-        }
-        @if (User.IsInRole(nameof(UserRole.Admin)))
-        {
-            <li><a asp-page="/Admin/Users">Manage users</a></li>
-        }
-        <li><a asp-page="/Account">Your account</a></li>
-    </ul>
-</div>
+@section Actions {
+    @if (isAdmin)
+    {
+        <a class="btn btn-primary" href="@Model.EditorUrl">@Icons.Get("globe") Open the editor</a>
+    }
+}
+@if (!isAdmin)
+{
+    <div class="panel">
+        <div class="empty">
+            @Icons.Get("lock")
+            <p><strong>Your account has no access yet.</strong></p>
+            <p>Ask an administrator to give you the Editor or Admin role, then sign in again.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="tiles">
+        <a class="tile" href="@Model.EditorUrl">
+            <span class="tile-label">@Icons.Get("globe") Languages</span>
+            <span class="tile-value">@Model.Cultures.Count</span>
+            <span class="tile-note">@string.Join(", ", Model.Cultures) · default @Model.DefaultCulture</span>
+        </a>
+        <a class="tile" asp-page="/Admin/Users">
+            <span class="tile-label">@Icons.Get("users") Users</span>
+            <span class="tile-value">@Model.UserCount</span>
+            <span class="tile-note">@(Model.DisabledUserCount == 0 ? "all enabled" : $"{Model.DisabledUserCount} disabled")</span>
+        </a>
+        <a class="tile" asp-page="/Admin/ApiKeys">
+            <span class="tile-label">@Icons.Get("key") API keys</span>
+            <span class="tile-value">@Model.ActiveKeyCount</span>
+            <span class="tile-note">
+                @if (!Model.ApiEnabled) { <text>delivery API turned off</text> }
+                else if (Model.KeyCount == 0) { <text>none yet</text> }
+                else { <text>active of @Model.KeyCount</text> }
+            </span>
+        </a>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><h2>Getting translations into your apps</h2></div>
+        <div class="panel-body">
+            <p class="lead">Apps read translations through the read-only delivery API. Create an API key for each app, then call the API with it in the <code>X-Api-Key</code> header.</p>
+            <div class="actions spaced">
+                <a class="btn" asp-page="/Admin/ApiKeys">@Icons.Get("key") Manage API keys</a>
+                @if (Model.OpenApiEnabled)
+                {
+                    <a class="btn btn-ghost" href="~/openapi/v1.json">OpenAPI document @Icons.Get("arrow-right")</a>
+                }
+            </div>
+        </div>
+    </div>
+}

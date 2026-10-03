@@ -1,9 +1,13 @@
 @page "/forbidden"
+@using Kododo.Polyglot.Web.Pages.Shared
 @{
     ViewData["Title"] = "Access denied";
 }
-<div class="card">
-    <h1>Access denied</h1>
-    <p>Your account is not allowed to open this page. Ask an administrator to change your role.</p>
-    <a href="@Url.Content("~/")">Back to home</a>
+<div class="panel">
+    <div class="empty">
+        @Icons.Get("lock")
+        <p><strong>Your account is not allowed to open this page.</strong></p>
+        <p>Ask an administrator to change your role.</p>
+        <a class="btn" href="~/">Back to the overview</a>
+    </div>
 </div>

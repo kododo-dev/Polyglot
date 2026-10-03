@@ -76,7 +76,11 @@ if (auth.Enabled)
 app.MapHealthChecks("/health");
 
 if (auth.Enabled)
-    app.MapRazorPages();
+{
+    // The pages' stylesheet, script and icon; open to everyone, since the sign-in page needs them.
+    app.MapStaticAssets();
+    app.MapRazorPages().WithStaticAssets();
+}
 else
     app.MapGet("/", (HttpContext ctx) => Results.Redirect($"{ctx.Request.PathBase}{editorPath}/"));
 

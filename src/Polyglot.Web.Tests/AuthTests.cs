@@ -209,6 +209,65 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Home_SendsEditorsStraightToTheEditor()
+    {
+        var factory = await CreateAppAsync();
+        await CreateUserAsync(factory, "erin", "erin-password-1", UserRole.Editor);
+        var client = NewClient(factory);
+        await LoginAsync(client, "erin", "erin-password-1");
+
+        var home = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
+        Assert.Equal("/translations/", home.Headers.Location?.OriginalString);
+    }
+
+    [Theory]
+    [InlineData("Role", "role", "Editor")]
+    [InlineData("Disabled", "disabled", "true")]
+    public async Task Admin_CannotChangeTheirOwnRoleOrDisableThemselves(string handler, string field, string value)
+    {
+        var factory = await CreateAppAsync();
+        // A second admin, so the last-admin rule is not what stops the change.
+        await CreateUserAsync(factory, "ada", "ada-password-1", UserRole.Admin);
+        var client = NewClient(factory);
+        await LoginAsync(client, "admin", AdminPassword);
+        Guid adminId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+            adminId = (await scope.ServiceProvider.GetRequiredService<UserService>().ListAsync())
+                .Single(u => u.Username == "admin").Id;
+
+        var token = await GetTokenAsync(client, "/admin/users");
+        var response = await client.PostAsync($"/admin/users?handler={handler}", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["id"] = adminId.ToString(),
+                [field] = value,
+                ["__RequestVerificationToken"] = token,
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("alert-error", await response.Content.ReadAsStringAsync());
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var admin = await scope.ServiceProvider.GetRequiredService<UserService>().FindByIdAsync(adminId);
+            Assert.Equal(UserRole.Admin, admin!.Role);
+            Assert.False(admin.IsDisabled);
+        }
+    }
+
+    [Fact]
+    public async Task Stylesheet_IsServedBeforeSignIn()
+    {
+        var client = NewClient(await CreateAppAsync());
+
+        var css = await client.GetAsync("/css/site.css");
+
+        Assert.Equal(HttpStatusCode.OK, css.StatusCode);
+        Assert.Equal("text/css", css.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task RoleChange_TakesEffectOnTheNextRequest()
     {
         var factory = await CreateAppAsync();

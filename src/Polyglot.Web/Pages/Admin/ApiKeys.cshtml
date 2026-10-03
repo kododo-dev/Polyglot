@@ -1,66 +1,97 @@
 @page "/admin/api-keys"
 @model ApiKeysModel
 @using Kododo.Polyglot.Web.Auth
+@using Kododo.Polyglot.Web.Pages.Shared
+@inject Kododo.CultureWay.CultureWayOptions CultureWay
 @{
     ViewData["Title"] = "API keys";
+    var createFailed = Model.Errors.Length > 0 && string.Equals(Request.Query["handler"], "Create", StringComparison.OrdinalIgnoreCase);
+    var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
 }
+@section Actions {
+    <button class="btn btn-primary" type="button" data-dialog="new-key">@Icons.Get("plus") New key</button>
+}
+
+@if (!Model.ApiEnabled)
+{
+    <div class="alert alert-warn" role="status">
+        @Icons.Get("info")
+        <div><p>The delivery API is turned off (<code>Polyglot__Api__Enabled=false</code>), so these keys open nothing until it is turned on.</p></div>
+    </div>
+}
+
 @if (Model.NewToken is not null)
 {
-    <div class="card">
-        <h2>Key '@Model.NewKeyName' created</h2>
-        <p>Copy the key now. It is shown only this once and cannot be shown again; if it is lost, create a new key.</p>
-        <div class="token">
-            <code id="new-token">@Model.NewToken</code>
-            <button class="secondary" type="button" id="copy-token">Copy</button>
+    <div class="panel">
+        <div class="panel-head">
+            <h2>Key '@Model.NewKeyName' created</h2>
+            <span class="badge dot ok">active</span>
         </div>
-        <p class="muted">Send it in the <code>X-Api-Key</code> header.</p>
+        <div class="panel-body form">
+            <div class="alert alert-warn" role="status">
+                @Icons.Get("alert")
+                <div><p><strong>Copy the key now.</strong> It is shown only this once. If it is lost, create a new key and delete this one.</p></div>
+            </div>
+            <div class="token">
+                <code id="new-token">@Model.NewToken</code>
+                <button class="btn" type="button" data-copy="new-token">@Icons.Get("copy") <span data-label>Copy</span></button>
+            </div>
+            <div>
+                <p class="section-label">Try it</p>
+                <pre class="code" id="new-token-example">curl -H "X-Api-Key: @Model.NewToken" "@baseUrl/api/v1/translations/@CultureWay.DefaultCulture"</pre>
+            </div>
+        </div>
     </div>
-    <script>
-        document.getElementById('copy-token').addEventListener('click', async e => {
-            await navigator.clipboard.writeText(document.getElementById('new-token').textContent);
-            e.target.textContent = 'Copied';
-        });
-    </script>
 }
-<div class="card">
-    <h1>API keys</h1>
-    @if (!Model.ApiEnabled)
-    {
-        <p class="muted">The delivery API is turned off (<code>Polyglot__Api__Enabled=false</code>), so these keys open nothing until it is turned on.</p>
-    }
-    @if (Model.Message is not null) { <p class="ok">@Model.Message</p> }
-    @foreach (var error in Model.Errors) { <p class="error">@error</p> }
+
+<partial name="_Alerts" model="new Alerts(Model.Message, createFailed ? [] : Model.Errors)" />
+
+<div class="panel">
     @if (Model.Keys.Count == 0)
     {
-        <p class="muted">No API keys yet.</p>
+        <div class="empty">
+            @Icons.Get("key")
+            <p>No API keys yet. Create one for each app that reads translations.</p>
+            <button class="btn btn-primary" type="button" data-dialog="new-key">@Icons.Get("plus") New key</button>
+        </div>
     }
     else
     {
-        <table>
-            <thead><tr><th>Key</th><th>Created</th><th>Last used</th><th>Expires</th><th>Actions</th></tr></thead>
+        <table class="table">
+            <thead>
+            <tr><th>Key</th><th>Status</th><th>Created</th><th>Last used</th><th>Expires</th><th><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
             <tbody>
             @foreach (var key in Model.Keys)
             {
+                var status = Model.Status(key);
                 <tr>
                     <td>
-                        @key.Name <span class="tag">@Model.Status(key)</span><br>
-                        <code class="muted">@(ApiKeyService.TokenPrefix + key.KeyId)_...</code>
-                        <span class="muted">@key.Scopes</span>
+                        <span class="name">@key.Name</span>
+                        <code class="sub">@(ApiKeyService.TokenPrefix + key.KeyId)_…</code>
                     </td>
-                    <td>@ApiKeysModel.Format(key.CreatedAt)</td>
-                    <td>@ApiKeysModel.Format(key.LastUsedAt)</td>
-                    <td>@ApiKeysModel.Format(key.ExpiresAt)</td>
-                    <td>
-                        <form method="post" asp-page-handler="Disabled">
-                            <input type="hidden" name="id" value="@key.Id">
-                            <input type="hidden" name="disabled" value="@((!key.IsDisabled).ToString().ToLowerInvariant())">
-                            <button class="secondary" type="submit">@(key.IsDisabled ? "Enable" : "Disable")</button>
-                        </form>
-                        <form method="post" asp-page-handler="Delete" data-name="@key.Name"
-                              onsubmit="return confirm(`Delete the key '${this.dataset.name}'? Apps using it lose access, and this cannot be undone.`)">
-                            <input type="hidden" name="id" value="@key.Id">
-                            <button class="secondary" type="submit">Delete</button>
-                        </form>
+                    <td data-label="Status">
+                        <span class="badge dot @(status switch { "active" => "ok", "expired" => "warn", _ => "danger" })">@status</span>
+                    </td>
+                    <td data-label="Created" class="num"><partial name="_Time" model="(DateTimeOffset?)key.CreatedAt" /></td>
+                    <td data-label="Last used" class="num"><partial name="_Time" model="key.LastUsedAt" /></td>
+                    <td data-label="Expires" class="num"><partial name="_Time" model="key.ExpiresAt" /></td>
+                    <td class="actions-cell">
+                        <div class="actions">
+                            <form method="post" asp-page-handler="Disabled"
+                                  data-confirm="@(key.IsDisabled ? $"Enable the key '{key.Name}'? Apps using it get access again." : $"Disable the key '{key.Name}'? Apps using it lose access until it is enabled again.")"
+                                  data-confirm-action="@(key.IsDisabled ? "Enable" : "Disable")">
+                                <input type="hidden" name="id" value="@key.Id">
+                                <input type="hidden" name="disabled" value="@((!key.IsDisabled).ToString().ToLowerInvariant())">
+                                <button class="btn" type="submit">@(key.IsDisabled ? "Enable" : "Disable")</button>
+                            </form>
+                            <form method="post" asp-page-handler="Delete"
+                                  data-confirm="Delete the key '@key.Name'? Apps using it lose access, and this cannot be undone."
+                                  data-confirm-action="Delete key" data-confirm-danger>
+                                <input type="hidden" name="id" value="@key.Id">
+                                <button class="btn btn-danger" type="submit">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             }
@@ -68,13 +99,52 @@
         </table>
     }
 </div>
-<div class="card">
-    <h2>Create a key</h2>
+
+<dialog class="dialog" id="new-key" aria-labelledby="new-key-title" data-open="@createFailed">
     <form method="post" asp-page-handler="Create">
-        <label for="name">Name (what the key is for, e.g. shop-frontend-prod)</label>
-        <input id="name" type="text" asp-for="Input.Name" maxlength="@ApiKeyService.MaxNameLength" autocomplete="off">
-        <label for="validThrough">Valid through (UTC, optional)</label>
-        <input id="validThrough" type="date" asp-for="Input.ValidThrough">
-        <button type="submit">Create key</button>
+        <div class="dialog-head" id="new-key-title">New API key</div>
+        <div class="dialog-body">
+            @if (createFailed)
+            {
+                <partial name="_Alerts" model="new Alerts(null, Model.Errors)" />
+            }
+            <div class="field">
+                <label for="name">Name</label>
+                <input id="name" type="text" asp-for="Input.Name" maxlength="@ApiKeyService.MaxNameLength" autocomplete="off" placeholder="shop-frontend-prod" required>
+                <span class="hint">What the key is for, so you know which app loses access if you disable it.</span>
+            </div>
+            <div class="field">
+                <span class="field-label">Expires</span>
+                <div class="choices" role="radiogroup" aria-label="Expires">
+                    <label><input type="radio" name="expiry" value="30"><span>30 days</span></label>
+                    <label><input type="radio" name="expiry" value="90"><span>90 days</span></label>
+                    <label><input type="radio" name="expiry" value="365"><span>1 year</span></label>
+                    <label><input type="radio" name="expiry" value="" checked><span>Never</span></label>
+                </div>
+                <input id="validThrough" type="date" asp-for="Input.ValidThrough" aria-label="Valid through (UTC)">
+                <span class="hint">The key works through the end of this day (UTC). Leave empty for a key that does not expire.</span>
+            </div>
+        </div>
+        <div class="dialog-foot">
+            <button class="btn" type="button" data-close>Cancel</button>
+            <button class="btn btn-primary" type="submit">Create key</button>
+        </div>
     </form>
-</div>
+</dialog>
+
+@section Scripts {
+    <script>
+        // The presets fill the date; picking a date by hand clears them.
+        (() => {
+            const date = document.getElementById('validThrough');
+            const presets = document.querySelectorAll('input[name="expiry"]');
+            presets.forEach(preset => preset.addEventListener('change', () => {
+                if (!preset.value) { date.value = ''; return; }
+                const day = new Date();
+                day.setUTCDate(day.getUTCDate() + Number(preset.value));
+                date.value = day.toISOString().slice(0, 10);
+            }));
+            date.addEventListener('input', () => presets.forEach(p => { p.checked = !date.value && !p.value; }));
+        })();
+    </script>
+}

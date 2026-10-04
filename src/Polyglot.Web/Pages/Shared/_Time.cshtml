@@ -1,0 +1,10 @@
+@model DateTimeOffset?
+@* Exact UTC time without JavaScript; site.js turns it into "3 days ago" with the exact time on hover. *@
+@if (Model is { } at)
+{
+    <time datetime="@at.UtcDateTime.ToString("O")" data-relative>@at.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</time>
+}
+else
+{
+    <span class="muted">never</span>
+}

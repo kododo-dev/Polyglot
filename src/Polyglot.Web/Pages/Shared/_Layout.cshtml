@@ -1,58 +1,99 @@
+@using Kododo.CultureWay.UI
 @using Kododo.Polyglot.Web.Auth
+@using Kododo.Polyglot.Web.Pages.Shared
 @using System.Security.Claims
 @inject PolyglotOptions Polyglot
+@{
+    var title = ViewData["Title"] as string;
+    var bare = ViewData["Bare"] is true;
+    var currentPage = ViewContext.RouteData.Values["page"] as string;
+    string? Current(string page) => currentPage == page ? "page" : null;
+    var links = EditorIntegration.Links(Context, Polyglot);
+    // The same rule as the editor's: a link is current when it points at this path.
+    static string Trim(string path) => path.TrimEnd('/') is { Length: > 0 } p ? p : "/";
+    bool IsCurrent(string url) => Trim(url) == Trim($"{Context.Request.PathBase}{Context.Request.Path}");
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@(ViewData["Title"] is string t ? $"{t} · Polyglot" : "Polyglot")</title>
-    <style>
-        :root { --bg:#f6f7f9; --fg:#1b1f24; --muted:#5d6774; --card:#fff; --line:#dde1e6; --accent:#2f6fed; --danger:#c62828; --ok:#1b7f3b; }
-        @@media (prefers-color-scheme: dark) {
-            :root { --bg:#14171b; --fg:#e6e9ed; --muted:#98a2b0; --card:#1d2126; --line:#2f353c; --accent:#6f9bff; --danger:#ef6b6b; --ok:#5fcf80; }
-        }
-        * { box-sizing: border-box; }
-        body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
-        header { display:flex; align-items:center; gap:16px; padding:12px 24px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
-        header .brand { font-weight:700; margin-right:auto; color:var(--fg); text-decoration:none; }
-        header a, header button.link { color:var(--accent); text-decoration:none; background:none; border:0; font:inherit; cursor:pointer; padding:0; margin:0; }
-        main { max-width:760px; margin:32px auto; padding:0 16px; }
-        .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:20px 24px; margin-bottom:20px; }
-        h1 { font-size:22px; margin:0 0 16px; } h2 { font-size:17px; margin:0 0 12px; }
-        label { display:block; font-weight:600; margin:12px 0 4px; }
-        input[type=text], input[type=password], input[type=date], select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
-        button, .btn { display:inline-block; padding:8px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; cursor:pointer; text-decoration:none; margin-top:16px; }
-        button.secondary { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:0; padding:4px 10px; }
-        .btn.sso { background:transparent; color:var(--accent); border:1px solid var(--accent); }
-        .error { color:var(--danger); } .ok { color:var(--ok); } .muted { color:var(--muted); }
-        table { width:100%; border-collapse:collapse; } th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
-        td form { display:inline-block; margin:0 4px 0 0; } td select { width:auto; padding:4px 6px; }
-        td input[type=password] { width:150px; padding:4px 6px; }
-        .tag { font-size:12px; border:1px solid var(--line); border-radius:99px; padding:1px 8px; color:var(--muted); }
-        code { font-family:ui-monospace, monospace; font-size:13px; }
-        .token { display:flex; gap:8px; align-items:center; } .token code { flex:1; overflow-wrap:anywhere; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); }
-        ul.links { list-style:none; margin:0; padding:0; } ul.links li { margin:8px 0; }
-    </style>
+    <title>@(title is not null ? $"{title} · Polyglot" : "Polyglot")</title>
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml">
+    <script>
+        // Before the stylesheet paints: the theme the translation editor saved, else the system's.
+        (() => {
+            let theme = null;
+            try { theme = localStorage.getItem('cultureway.theme'); } catch { }
+            if (theme !== 'light' && theme !== 'dark')
+                theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
 </head>
 <body>
-<header>
-    <a class="brand" href="@Url.Content("~/")">Polyglot</a>
-    @if (User.Identity?.IsAuthenticated == true)
-    {
-        @if (User.IsInRole(nameof(UserRole.Admin)) || User.IsInRole(nameof(UserRole.Editor)))
-        {
-            <a href="@($"{Context.Request.PathBase}{Polyglot.GetEditorPath()}/")">Translations</a>
-        }
-        @if (User.IsInRole(nameof(UserRole.Admin)))
-        {
-            <a asp-page="/Admin/Users">Users</a>
-            <a asp-page="/Admin/ApiKeys">API keys</a>
-        }
-        <a asp-page="/Account">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
-        <form method="post" asp-page="/Logout" style="margin:0"><button class="link" type="submit">Sign out</button></form>
-    }
-</header>
-<main>@RenderBody()</main>
+@if (bare)
+{
+    <main class="auth-page">@RenderBody()</main>
+}
+else
+{
+    <div class="shell">
+        <aside class="sidebar" aria-label="Main menu">
+            <div class="sidebar-head">
+                <a class="brand" href="~/">Polyglot</a>
+                <partial name="_ThemeToggle" />
+            </div>
+            @* The editor keeps its namespaces up here; these pages have nothing to put in their place. *@
+            <div class="sidebar-fill"></div>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @* Same links, icons and order as at the bottom of the editor's side menu (EditorIntegration.Links). *@
+                <div class="host-menu">
+                    @if (links.Count > 0)
+                    {
+                        <nav class="nav" aria-label="Pages">
+                            @foreach (var link in links)
+                            {
+                                <a class="nav-item" href="@link.Url" aria-current="@(IsCurrent(link.Url) ? "page" : null)">@Icons.Get(link.Icon ?? "arrow-right") @link.Label</a>
+                            }
+                        </nav>
+                        <hr class="host-divider">
+                    }
+                    <div class="user-row">
+                        @Icons.Get("user")
+                        <a class="user" asp-page="/Account" aria-current="@Current("/Account")">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
+                        <form method="post" asp-page="/Logout">
+                            <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">@Icons.Get("logout")</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </aside>
+        <div class="backdrop" data-menu-toggle></div>
+        <div class="main">
+            <header class="topbar">
+                <button class="icon-btn menu-button" type="button" data-menu-toggle aria-label="Open menu">@Icons.Get("menu")</button>
+                <h1>@title</h1>
+                @await RenderSectionAsync("Actions", required: false)
+            </header>
+            <main class="content">
+                <div class="content-inner">@RenderBody()</div>
+            </main>
+        </div>
+    </div>
+
+    <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+        <div class="dialog-head" id="confirm-title">Are you sure?</div>
+        <div class="dialog-body"><p data-fill="message"></p></div>
+        <div class="dialog-foot">
+            <button class="btn" type="button" data-close>Cancel</button>
+            <button class="btn btn-primary" type="button" data-confirm-ok>Confirm</button>
+        </div>
+    </dialog>
+}
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

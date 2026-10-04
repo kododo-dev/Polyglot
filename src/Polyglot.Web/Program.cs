@@ -32,7 +32,7 @@ builder.Services.AddCultureWay(x =>
 {
     x.Options.SupportedCultures = cultures;
     x.Options.DefaultCulture = polyglot.DefaultCulture.Trim().Length > 0 ? polyglot.DefaultCulture.Trim() : cultures[0];
-    x.AddEditor();
+    x.AddEditor(editor => EditorIntegration.Configure(editor, polyglot, auth.Enabled));
     if (!string.IsNullOrWhiteSpace(connectionString))
         x.UsePostgreSQL(connectionString);
 });
@@ -76,7 +76,11 @@ if (auth.Enabled)
 app.MapHealthChecks("/health");
 
 if (auth.Enabled)
-    app.MapRazorPages();
+{
+    // The pages' stylesheet, script and icon; open to everyone, since the sign-in page needs them.
+    app.MapStaticAssets();
+    app.MapRazorPages().WithStaticAssets();
+}
 else
     app.MapGet("/", (HttpContext ctx) => Results.Redirect($"{ctx.Request.PathBase}{editorPath}/"));
 

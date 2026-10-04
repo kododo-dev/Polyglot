@@ -141,7 +141,7 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("class=\"error\"", html);
+        Assert.Contains("alert-error", html);
         Assert.DoesNotMatch(ApiTokenPattern(), html);
         await using var scope = factory.Services.CreateAsyncScope();
         Assert.Empty(await scope.ServiceProvider.GetRequiredService<ApiKeyService>().ListAsync());

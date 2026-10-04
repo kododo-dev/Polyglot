@@ -1,24 +1,41 @@
 @page "/account"
 @model AccountModel
+@using Kododo.Polyglot.Web.Pages.Shared
+@using System.Security.Claims
 @{
     ViewData["Title"] = "Account";
+    var displayName = User.FindFirstValue("display_name");
 }
-<div class="card">
-    <h1>Account</h1>
-    <p><strong>@Model.Username</strong> <span class="tag">@Model.Role</span></p>
-    @if (Model.Message is not null) { <p class="ok">@Model.Message</p> }
+
+<partial name="_Alerts" model="new Alerts(Model.Message, Model.Errors)" />
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>@(string.IsNullOrWhiteSpace(displayName) ? Model.Username : displayName)</h2>
+        <span class="badge accent">@(Model.Role == UserRole.None ? "No access" : Model.Role.ToString())</span>
+    </div>
+    <div class="panel-body">
+        <p class="muted">Signed in as <code>@Model.Username</code>@(Model.HasPassword ? "" : " through single sign-on")</p>
+    </div>
 </div>
+
 @if (Model.HasPassword)
 {
-    <div class="card">
-        <h2>Change password</h2>
-        @foreach (var error in Model.Errors) { <p class="error">@error</p> }
-        <form method="post">
-            <label for="current">Current password</label>
-            <input id="current" type="password" asp-for="Input.CurrentPassword" autocomplete="current-password">
-            <label for="new">New password</label>
-            <input id="new" type="password" asp-for="Input.NewPassword" autocomplete="new-password">
-            <button type="submit">Change password</button>
-        </form>
+    <div class="panel">
+        <div class="panel-head"><h2>Change password</h2></div>
+        <div class="panel-body">
+            <form class="form narrow" method="post">
+                <div class="field">
+                    <label for="current">Current password</label>
+                    <input id="current" type="password" asp-for="Input.CurrentPassword" autocomplete="current-password" required>
+                </div>
+                <div class="field">
+                    <label for="new">New password</label>
+                    <input id="new" type="password" asp-for="Input.NewPassword" autocomplete="new-password" minlength="@Kododo.Polyglot.Web.Auth.UserService.MinPasswordLength" required>
+                    <span class="hint">At least @Kododo.Polyglot.Web.Auth.UserService.MinPasswordLength characters.</span>
+                </div>
+                <div><button class="btn btn-primary" type="submit">Change password</button></div>
+            </form>
+        </div>
     </div>
 }

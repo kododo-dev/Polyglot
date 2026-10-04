@@ -1,69 +1,140 @@
 @page "/admin/users"
 @model UsersModel
 @using Kododo.Polyglot.Web.Auth
+@using Kododo.Polyglot.Web.Pages.Shared
 @{
     ViewData["Title"] = "Users";
+    var createFailed = Model.Errors.Length > 0 && string.Equals(Request.Query["handler"], "Create", StringComparison.OrdinalIgnoreCase);
 }
-<div class="card">
-    <h1>Users</h1>
-    @if (Model.Message is not null) { <p class="ok">@Model.Message</p> }
-    @foreach (var error in Model.Errors) { <p class="error">@error</p> }
-    <table>
-        <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
+@section Actions {
+    <button class="btn btn-primary" type="button" data-dialog="add-user">@Icons.Get("plus") Add user</button>
+}
+
+<p class="lead">Editors edit translations. Admins can also manage users, API keys and languages.</p>
+
+<partial name="_Alerts" model="new Alerts(Model.Message, createFailed ? [] : Model.Errors)" />
+
+<div class="panel">
+    <table class="table">
+        <thead>
+        <tr><th>User</th><th>Role</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr>
+        </thead>
         <tbody>
         @foreach (var user in Model.Users)
         {
+            var isSelf = user.Id == Model.CurrentUserId;
+            var hasDisplayName = !string.IsNullOrWhiteSpace(user.DisplayName) && user.DisplayName != user.Username;
+            var details = new[] { hasDisplayName ? user.Username : null, user.ExternalSubject is not null ? "single sign-on" : null }
+                .Where(d => d is not null).ToArray();
             <tr>
                 <td>
-                    @user.Username
-                    @if (user.ExternalSubject is not null) { <span class="tag">SSO</span> }
-                    @if (user.IsDisabled) { <span class="tag">disabled</span> }
+                    <span class="name">@(hasDisplayName ? user.DisplayName : user.Username)</span>
+                    @if (isSelf) { <span class="badge accent">you</span> }
+                    @if (details.Length > 0) { <span class="sub">@string.Join(" · ", details)</span> }
                 </td>
-                <td>
-                    <form method="post" asp-page-handler="Role">
-                        <input type="hidden" name="id" value="@user.Id">
-                        <select name="role" onchange="this.form.submit()">
-                            @foreach (var role in Enum.GetValues<UserRole>())
-                            {
-                                <option value="@role" selected="@(role == user.Role)">@role</option>
-                            }
-                        </select>
-                    </form>
-                </td>
-                <td>
-                    <form method="post" asp-page-handler="Disabled">
-                        <input type="hidden" name="id" value="@user.Id">
-                        <input type="hidden" name="disabled" value="@((!user.IsDisabled).ToString().ToLowerInvariant())">
-                        <button class="secondary" type="submit">@(user.IsDisabled ? "Enable" : "Disable")</button>
-                    </form>
-                    @if (user.PasswordHash is not null)
+                <td data-label="Role">
+                    @if (isSelf)
                     {
-                        <form method="post" asp-page-handler="ResetPassword">
+                        <span>@user.Role</span>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="Role">
                             <input type="hidden" name="id" value="@user.Id">
-                            <input type="password" name="newPassword" placeholder="New password" autocomplete="new-password">
-                            <button class="secondary" type="submit">Reset</button>
+                            <select class="compact" name="role" aria-label="Role of @user.Username"
+                                    data-confirm="Change the role of '@user.Username' to {value}?" data-confirm-action="Change role">
+                                @foreach (var role in Enum.GetValues<UserRole>())
+                                {
+                                    <option value="@role" selected="@(role == user.Role)">@(role == UserRole.None ? "No access" : role.ToString())</option>
+                                }
+                            </select>
+                            <noscript><button class="btn" type="submit">Save</button></noscript>
                         </form>
                     }
+                </td>
+                <td data-label="Status">
+                    @if (user.IsDisabled) { <span class="badge dot danger">disabled</span> }
+                    else if (user.Role == UserRole.None) { <span class="badge dot warn">no access</span> }
+                    else { <span class="badge dot ok">active</span> }
+                </td>
+                <td class="actions-cell">
+                    <div class="actions">
+                        @if (user.PasswordHash is not null)
+                        {
+                            <button class="btn" type="button" data-dialog="reset-password"
+                                    data-fill-id="@user.Id" data-fill-username="@user.Username">Reset password</button>
+                        }
+                        @if (!isSelf)
+                        {
+                            <form method="post" asp-page-handler="Disabled"
+                                  data-confirm="@(user.IsDisabled ? $"Enable '{user.Username}'? They can sign in again." : $"Disable '{user.Username}'? They are signed out and cannot sign in until enabled.")"
+                                  data-confirm-action="@(user.IsDisabled ? "Enable" : "Disable")"
+                                  data-confirm-danger="@(!user.IsDisabled)">
+                                <input type="hidden" name="id" value="@user.Id">
+                                <input type="hidden" name="disabled" value="@((!user.IsDisabled).ToString().ToLowerInvariant())">
+                                <button class="btn @(user.IsDisabled ? "" : "btn-danger")" type="submit">@(user.IsDisabled ? "Enable" : "Disable")</button>
+                            </form>
+                        }
+                    </div>
                 </td>
             </tr>
         }
         </tbody>
     </table>
 </div>
-<div class="card">
-    <h2>Add a user</h2>
+
+<dialog class="dialog" id="add-user" aria-labelledby="add-user-title" data-open="@createFailed">
     <form method="post" asp-page-handler="Create">
-        <label for="username">Username</label>
-        <input id="username" type="text" asp-for="Input.Username" autocomplete="off">
-        <label for="displayName">Display name (optional)</label>
-        <input id="displayName" type="text" asp-for="Input.DisplayName" autocomplete="off">
-        <label for="password">Password (min @UserService.MinPasswordLength characters)</label>
-        <input id="password" type="password" asp-for="Input.Password" autocomplete="new-password">
-        <label for="role">Role</label>
-        <select id="role" asp-for="Input.Role">
-            <option value="@UserRole.Editor">Editor</option>
-            <option value="@UserRole.Admin">Admin</option>
-        </select>
-        <button type="submit">Create user</button>
+        <div class="dialog-head" id="add-user-title">Add user</div>
+        <div class="dialog-body">
+            @if (createFailed)
+            {
+                <partial name="_Alerts" model="new Alerts(null, Model.Errors)" />
+            }
+            <div class="field">
+                <label for="username">Username</label>
+                <input id="username" type="text" asp-for="Input.Username" autocomplete="off" required>
+            </div>
+            <div class="field">
+                <label for="displayName">Display name</label>
+                <input id="displayName" type="text" asp-for="Input.DisplayName" autocomplete="off">
+                <span class="hint">Optional. Shown instead of the username.</span>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" type="password" asp-for="Input.Password" autocomplete="new-password" minlength="@UserService.MinPasswordLength" required>
+                <span class="hint">At least @UserService.MinPasswordLength characters. Share it with the user; they can change it on their account page.</span>
+            </div>
+            <div class="field">
+                <span class="field-label">Role</span>
+                <div class="choices" role="radiogroup" aria-label="Role">
+                    <label><input type="radio" asp-for="Input.Role" value="@UserRole.Editor"><span>Editor</span></label>
+                    <label><input type="radio" asp-for="Input.Role" value="@UserRole.Admin"><span>Admin</span></label>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-foot">
+            <button class="btn" type="button" data-close>Cancel</button>
+            <button class="btn btn-primary" type="submit">Create user</button>
+        </div>
     </form>
-</div>
+</dialog>
+
+<dialog class="dialog" id="reset-password" aria-labelledby="reset-title">
+    <form method="post" asp-page-handler="ResetPassword">
+        <div class="dialog-head" id="reset-title">Reset password</div>
+        <div class="dialog-body">
+            <p>Set a new password for <strong data-fill="username"></strong>. Their current password stops working.</p>
+            <input type="hidden" name="id">
+            <div class="field">
+                <label for="newPassword">New password</label>
+                <input id="newPassword" type="password" name="newPassword" autocomplete="new-password" minlength="@UserService.MinPasswordLength" required>
+                <span class="hint">At least @UserService.MinPasswordLength characters.</span>
+            </div>
+        </div>
+        <div class="dialog-foot">
+            <button class="btn" type="button" data-close>Cancel</button>
+            <button class="btn btn-primary" type="submit">Reset password</button>
+        </div>
+    </form>
+</dialog>

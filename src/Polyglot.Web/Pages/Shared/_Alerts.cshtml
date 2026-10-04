@@ -1,0 +1,13 @@
+@using Kododo.Polyglot.Web.Pages.Shared
+@model Alerts
+@if (Model.Message is not null)
+{
+    <div class="alert alert-ok" role="status">@Icons.Get("check")<div><p>@Model.Message</p></div></div>
+}
+@if (Model.Errors.Count > 0)
+{
+    <div class="alert alert-error" role="alert">
+        @Icons.Get("alert")
+        <div>@foreach (var error in Model.Errors) { <p>@error</p> }</div>
+    </div>
+}

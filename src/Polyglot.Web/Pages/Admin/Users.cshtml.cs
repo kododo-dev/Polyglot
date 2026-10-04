@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -28,6 +29,10 @@ public class UsersModel(UserService users) : PageModel
 
     public string[] Errors { get; private set; } = [];
 
+    /// <summary>Admins cannot lock themselves out: their own row has no role or disable controls.</summary>
+    public Guid? CurrentUserId
+        => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+
     public async Task OnGetAsync() => Users = await users.ListAsync(HttpContext.RequestAborted);
 
     public async Task<IActionResult> OnPostCreateAsync()
@@ -44,12 +49,16 @@ public class UsersModel(UserService users) : PageModel
     }
 
     public async Task<IActionResult> OnPostRoleAsync(Guid id, UserRole role)
-        => await ApplyAsync(await users.SetRoleAsync(id, role, HttpContext.RequestAborted), "Role updated.");
+        => id == CurrentUserId
+            ? await ShowErrorsAsync(["You cannot change your own role. Ask another administrator."])
+            : await ApplyAsync(await users.SetRoleAsync(id, role, HttpContext.RequestAborted), "Role updated.");
 
     public async Task<IActionResult> OnPostDisabledAsync(Guid id, bool disabled)
-        => await ApplyAsync(
-            await users.SetDisabledAsync(id, disabled, HttpContext.RequestAborted),
-            disabled ? "User disabled." : "User enabled.");
+        => id == CurrentUserId
+            ? await ShowErrorsAsync(["You cannot disable your own account. Ask another administrator."])
+            : await ApplyAsync(
+                await users.SetDisabledAsync(id, disabled, HttpContext.RequestAborted),
+                disabled ? "User disabled." : "User enabled.");
 
     public async Task<IActionResult> OnPostResetPasswordAsync(Guid id, string newPassword)
         => await ApplyAsync(

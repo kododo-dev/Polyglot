@@ -1,26 +1,41 @@
 @page "/login"
 @model LoginModel
+@using Kododo.Polyglot.Web.Pages.Shared
 @{
     ViewData["Title"] = "Sign in";
+    ViewData["Bare"] = true;
 }
-<div class="card">
-    <h1>Sign in</h1>
+<div class="auth-card">
+    <partial name="_ThemeToggle" />
+    <span class="brand">Polyglot</span>
+    <p class="lead">Sign in to manage translations.</p>
+
     @if (Model.Error is not null)
     {
-        <p class="error">@Model.Error</p>
+        <div class="alert alert-error" role="alert">@Icons.Get("alert")<div><p>@Model.Error</p></div></div>
     }
+
     @if (Model.LocalEnabled)
     {
-        <form method="post" asp-route-returnUrl="@Model.ReturnUrl">
-            <label for="username">Username</label>
-            <input id="username" type="text" asp-for="Username" autocomplete="username" autofocus>
-            <label for="password">Password</label>
-            <input id="password" type="password" asp-for="Password" autocomplete="current-password">
-            <button type="submit">Sign in</button>
+        <form class="form" method="post" asp-route-returnUrl="@Model.ReturnUrl">
+            <div class="field">
+                <label for="username">Username</label>
+                <input id="username" type="text" asp-for="Username" autocomplete="username" autofocus required>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" type="password" asp-for="Password" autocomplete="current-password" required>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Sign in</button>
         </form>
     }
+
     @if (Model.OidcName is not null)
     {
-        <p><a class="btn sso" asp-page-handler="Oidc" asp-route-returnUrl="@Model.ReturnUrl">@Model.OidcName</a></p>
+        @if (Model.LocalEnabled)
+        {
+            <div class="divider">or</div>
+        }
+        <a class="btn btn-block" asp-page-handler="Oidc" asp-route-returnUrl="@Model.ReturnUrl">@Icons.Get("lock") Continue with @Model.OidcName</a>
     }
 </div>

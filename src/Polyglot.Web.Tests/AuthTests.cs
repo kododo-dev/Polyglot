@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
@@ -129,6 +130,64 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SignOut_FromTheEditor_NeedsNoAntiforgeryToken()
+    {
+        var client = NewClient(await CreateAppAsync());
+        await LoginAsync(client, "admin", AdminPassword);
+
+        var logout = await client.PostAsync("/logout", new FormUrlEncodedContent([]));
+
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await CallEditorApiAsync(client)).StatusCode);
+    }
+
+    private static async Task<JsonElement> EditorSettingsAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/translations/api/GetEditorSettings", new { });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    [Fact]
+    public async Task EditorSettings_ForAdmin_LinkTheAdminPagesAndAllowLanguageChanges()
+    {
+        var client = NewClient(await CreateAppAsync());
+        await LoginAsync(client, "admin", AdminPassword);
+
+        var settings = await EditorSettingsAsync(client);
+
+        Assert.Equal("Polyglot", settings.GetProperty("title").GetString());
+        Assert.Equal(
+            ["/", "/translations/", "/admin/users", "/admin/api-keys"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+        Assert.Equal(
+            ["home", "translations", "users", "key"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
+        Assert.Equal("/logout", settings.GetProperty("user").GetProperty("signOutUrl").GetString());
+        Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
+    }
+
+    [Fact]
+    public async Task EditorRole_CannotChangeLanguages()
+    {
+        var factory = await CreateAppAsync();
+        await CreateUserAsync(factory, "erin", "erin-password-1", UserRole.Editor);
+        var client = NewClient(factory);
+        await LoginAsync(client, "erin", "erin-password-1");
+
+        var settings = await EditorSettingsAsync(client);
+        var add = await client.PostAsJsonAsync("/translations/api/AddCulture", new { culture = "fr" });
+
+        // Only the editor itself: no overview or admin pages.
+        Assert.Equal(
+            ["/translations/"],
+            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+        Assert.Equal("erin", settings.GetProperty("user").GetProperty("name").GetString());
+        Assert.False(settings.GetProperty("canManageCultures").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);
+    }
+
+    [Fact]
     public async Task LoginReturnUrl_MustBeLocal()
     {
         var client = NewClient(await CreateAppAsync());
@@ -153,6 +212,65 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, api.StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, users.StatusCode);
         Assert.Equal("/forbidden", users.Headers.Location?.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task Home_SendsEditorsStraightToTheEditor()
+    {
+        var factory = await CreateAppAsync();
+        await CreateUserAsync(factory, "erin", "erin-password-1", UserRole.Editor);
+        var client = NewClient(factory);
+        await LoginAsync(client, "erin", "erin-password-1");
+
+        var home = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
+        Assert.Equal("/translations/", home.Headers.Location?.OriginalString);
+    }
+
+    [Theory]
+    [InlineData("Role", "role", "Editor")]
+    [InlineData("Disabled", "disabled", "true")]
+    public async Task Admin_CannotChangeTheirOwnRoleOrDisableThemselves(string handler, string field, string value)
+    {
+        var factory = await CreateAppAsync();
+        // A second admin, so the last-admin rule is not what stops the change.
+        await CreateUserAsync(factory, "ada", "ada-password-1", UserRole.Admin);
+        var client = NewClient(factory);
+        await LoginAsync(client, "admin", AdminPassword);
+        Guid adminId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+            adminId = (await scope.ServiceProvider.GetRequiredService<UserService>().ListAsync())
+                .Single(u => u.Username == "admin").Id;
+
+        var token = await GetTokenAsync(client, "/admin/users");
+        var response = await client.PostAsync($"/admin/users?handler={handler}", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["id"] = adminId.ToString(),
+                [field] = value,
+                ["__RequestVerificationToken"] = token,
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("alert-error", await response.Content.ReadAsStringAsync());
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var admin = await scope.ServiceProvider.GetRequiredService<UserService>().FindByIdAsync(adminId);
+            Assert.Equal(UserRole.Admin, admin!.Role);
+            Assert.False(admin.IsDisabled);
+        }
+    }
+
+    [Fact]
+    public async Task Stylesheet_IsServedBeforeSignIn()
+    {
+        var client = NewClient(await CreateAppAsync());
+
+        var css = await client.GetAsync("/css/site.css");
+
+        Assert.Equal(HttpStatusCode.OK, css.StatusCode);
+        Assert.Equal("text/css", css.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]

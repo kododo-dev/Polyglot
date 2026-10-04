@@ -116,6 +116,7 @@ POLYGLOT_UPDATE_OPENAPI=1 dotnet test src/Polyglot.slnx --filter OpenApiTests
    clients ([docs/delivery-api.md](docs/delivery-api.md)).~~
 3. Statuses, history, import and export.
 4. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
+5. AI help with translation: connect an AI model that suggests translations into other languages.
 
 ## License
 

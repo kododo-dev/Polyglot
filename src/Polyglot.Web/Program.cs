@@ -4,6 +4,7 @@ using Kododo.CultureWay.UI;
 using Kododo.Polyglot.Web;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
+using Kododo.Polyglot.Web.History;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,7 +39,11 @@ builder.Services.AddCultureWay(x =>
 });
 
 if (auth.Enabled)
+{
     builder.Services.AddPolyglotAuth(connectionString!, auth, editorPath);
+    // The history needs the database, and a user to attribute changes to.
+    builder.Services.AddPolyglotHistory();
+}
 
 if (apiEnabled)
     builder.Services.AddPolyglotApi(api);

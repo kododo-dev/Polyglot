@@ -158,10 +158,10 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
 
         Assert.Equal("Polyglot", settings.GetProperty("title").GetString());
         Assert.Equal(
-            ["/", "/translations/", "/admin/users", "/admin/api-keys"],
+            ["/", "/translations/", "/history", "/admin/users", "/admin/api-keys"],
             settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
         Assert.Equal(
-            ["home", "translations", "users", "key"],
+            ["home", "translations", "history", "users", "key"],
             settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
         Assert.Equal("/logout", settings.GetProperty("user").GetProperty("signOutUrl").GetString());
         Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
@@ -180,7 +180,7 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
 
         // Only the editor itself: no overview or admin pages.
         Assert.Equal(
-            ["/translations/"],
+            ["/translations/", "/history"],
             settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
         Assert.Equal("erin", settings.GetProperty("user").GetProperty("name").GetString());
         Assert.False(settings.GetProperty("canManageCultures").GetBoolean());

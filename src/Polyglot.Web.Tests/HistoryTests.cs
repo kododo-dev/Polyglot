@@ -166,6 +166,38 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task The_history_page_filters_by_day_with_both_ends_included()
+    {
+        var factory = await CreateAppAsync();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (var (key, at) in new[]
+                     {
+                         ("Day.Before", new DateTimeOffset(2026, 9, 30, 23, 59, 59, TimeSpan.Zero)),
+                         ("Day.First", new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero)),
+                         ("Day.Last", new DateTimeOffset(2026, 10, 2, 23, 59, 59, TimeSpan.Zero)),
+                         ("Day.After", new DateTimeOffset(2026, 10, 3, 0, 0, 0, TimeSpan.Zero)),
+                     })
+                db.TranslationChanges.Add(new TranslationChange
+                {
+                    ChangeSetId = Guid.NewGuid(), Key = key, Culture = "en", NewValue = key, UserName = "System", ChangedAt = at,
+                });
+            await db.SaveChangesAsync();
+        }
+        var client = await SignInAsync(factory);
+
+        var page = await client.GetStringAsync("/history?from=2026-10-01&to=2026-10-02");
+
+        Assert.Contains("Day.First", page);
+        Assert.Contains("Day.Last", page);
+        Assert.DoesNotContain("Day.Before", page);
+        Assert.DoesNotContain("Day.After", page);
+        // The chosen days stay in the form.
+        Assert.Contains("value=\"2026-10-01\"", page);
+    }
+
+    [Fact]
     public async Task Undo_restores_the_old_value_and_is_recorded()
     {
         var factory = await CreateAppAsync();

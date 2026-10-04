@@ -396,7 +396,10 @@ select.compact { width: auto; padding: 4px 8px; font-size: .78rem; }
 
 /* ── History ───────────────────────────────────────────────────── */
 
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; margin-bottom: 16px; }
+/* One row on a wide screen, wrapping on a narrow one; the key field gets the most room. */
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+.filters .field { flex: 1 1 130px; }
+.filters .field:first-child { flex-grow: 2; }
 /* As tall as the inputs next to them. */
 .filters .btn { padding-block: 8px; font-size: .82rem; }
 .table a.name { color: inherit; text-decoration: none; }

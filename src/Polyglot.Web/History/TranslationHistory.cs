@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Kododo.Polyglot.Web.History;
 
-public sealed record HistoryFilter(string? Key, string? Culture, Guid? UserId);
+/// <summary>What to show. <paramref name="From"/> and <paramref name="To"/> are UTC days, both included.</summary>
+public sealed record HistoryFilter(string? Key, string? Culture, Guid? UserId, DateOnly? From = null, DateOnly? To = null);
 
 public sealed record HistoryPage(IReadOnlyList<TranslationChange> Changes, long? OlderThan);
 
@@ -29,6 +30,16 @@ public sealed class TranslationHistory(AppDbContext db, IStore store, CultureWay
             query = query.Where(c => c.Culture == filter.Culture);
         if (filter.UserId is { } userId)
             query = query.Where(c => c.UserId == userId);
+        if (filter.From is { } from)
+        {
+            var start = StartOfDay(from);
+            query = query.Where(c => c.ChangedAt >= start);
+        }
+        if (filter.To is { } to)
+        {
+            var end = StartOfDay(to.AddDays(1));
+            query = query.Where(c => c.ChangedAt < end);
+        }
         if (before is { } id)
             query = query.Where(c => c.Id < id);
 
@@ -76,6 +87,8 @@ public sealed class TranslationHistory(AppDbContext db, IStore store, CultureWay
 
         return [];
     }
+
+    private static DateTimeOffset StartOfDay(DateOnly day) => new(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
     private static string EscapeLike(string value)
         => value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");

@@ -156,7 +156,7 @@ Pushing a `v*` tag (for example `v0.1.0`) runs CI and then publishes the image t
 1. ~~Authentication and authorization: local users and OpenID Connect.~~
 2. ~~API keys and a delivery API for consuming apps, with an OpenAPI document for generating
    clients ([docs/delivery-api.md](docs/delivery-api.md)).~~
-3. A published Docker image, so Polyglot can be run without building it from source.
+3. ~~A published Docker image, so Polyglot can be run without building it from source.~~
 4. Statuses, history, import and export.
 5. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
 6. AI help with translation: connect an AI model that suggests translations into other languages.

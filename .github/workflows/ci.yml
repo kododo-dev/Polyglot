@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # The Docker publish workflow runs CI first.
+  workflow_call:
 
 jobs:
   test:

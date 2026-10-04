@@ -6,12 +6,49 @@ Self-hosted translation management for .NET, built on the [CultureWay](https://g
 
 ## Quick start
 
+Polyglot is published as `ghcr.io/kododo-dev/polyglot` for `linux/amd64` and `linux/arm64`. Save this as `compose.yaml`:
+
+```yaml
+services:
+  polyglot:
+    image: ghcr.io/kododo-dev/polyglot:latest
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=polyglot;Username=polyglot;Password=polyglot;Gss Encryption Mode=Disable"
+      Polyglot__Cultures: "en,pl,de"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: polyglot
+      POSTGRES_USER: polyglot
+      POSTGRES_PASSWORD: polyglot
+    volumes:
+      - polyglot-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polyglot -d polyglot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  polyglot-db:
+```
+
+Then start it and read the password of the initial administrator:
+
 ```bash
-docker compose up --build
+docker compose up -d
 docker compose logs polyglot | grep "initial administrator"
 ```
 
-The second command shows the generated password of the initial `admin` user (printed once). Open <http://localhost:8080>, sign in, and open the editor at `/translations`. Set `Polyglot__Auth__Bootstrap__Password` to choose the password yourself.
+The password of the initial `admin` user is printed once. Open <http://localhost:8080>, sign in, and open the editor at `/translations`. Set `Polyglot__Auth__Bootstrap__Password` to choose the password yourself.
+
+Image tags: `latest` is the newest release, `1.2` follows the newest patch of 1.2, and `1.2.3` is one release. Pin a version in production.
 
 ## Configuration
 
@@ -94,6 +131,7 @@ Design notes: [docs/delivery-api.md](docs/delivery-api.md).
 ```bash
 dotnet test src/Polyglot.slnx   # needs Docker (Testcontainers)
 dotnet run --project src/Polyglot.Web
+docker compose up --build       # builds the image from source, with PostgreSQL
 ```
 
 Adding an EF Core migration for the auth tables:
@@ -108,6 +146,10 @@ A test fails when [docs/openapi/v1.json](docs/openapi/v1.json) differs from the 
 ```bash
 POLYGLOT_UPDATE_OPENAPI=1 dotnet test src/Polyglot.slnx --filter OpenApiTests
 ```
+
+### Releases
+
+Pushing a `v*` tag (for example `v0.1.0`) runs CI and then publishes the image to GHCR for `linux/amd64` and `linux/arm64`, with the version from the tag. A pre-release tag such as `v0.2.0-rc.1` is published under its own tag only and does not move `latest`.
 
 ## Roadmap
 

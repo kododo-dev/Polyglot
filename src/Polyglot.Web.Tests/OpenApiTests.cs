@@ -126,5 +126,35 @@ public sealed class OpenApiTests(PostgresFixture postgres) : IAsyncLifetime
         var client = await CreateClientAsync(("Polyglot:Api:OpenApi:Enabled", "false"));
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api-reference/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reference_IsServedWithoutSignIn_AndCallsNobodyElse()
+    {
+        var client = await CreateClientAsync();
+
+        var response = await client.GetAsync("/api-reference/");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"url\":\"openapi/v1.json\"", html);
+        Assert.Contains("\"telemetry\":false", html);
+        Assert.Contains("\"agent\":{\"disabled\":true}", html);
+        Assert.Contains("\"withDefaultFonts\":false", html);
+        Assert.Contains("\"showDeveloperTools\":\"never\"", html);
+        // Outside the demo no key is filled in.
+        Assert.DoesNotContain("pg_", html);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api-reference/scalar.js")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reference_PointsAtThisInstance_PathBaseIncluded()
+    {
+        var root = await CreateClientAsync();
+        var underPath = await CreateClientAsync(("Polyglot:PathBase", "/polyglot"));
+
+        Assert.Contains("\"servers\":[{\"url\":\"/\"}]", await root.GetStringAsync("/api-reference/"));
+        Assert.Contains("\"servers\":[{\"url\":\"/polyglot\"}]", await underPath.GetStringAsync("/polyglot/api-reference/"));
     }
 }

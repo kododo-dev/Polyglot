@@ -123,6 +123,7 @@ public sealed partial class DemoTests(PostgresFixture postgres) : IAsyncLifetime
 
         Assert.Contains("demo-banner", overview);
         Assert.Contains(DemoOptions.DefaultApiKey, overview);
+        Assert.Contains($"\"value\":\"{DemoOptions.DefaultApiKey}\"", await NewClient(factory).GetStringAsync("/api-reference/"));
     }
 
     [Fact]

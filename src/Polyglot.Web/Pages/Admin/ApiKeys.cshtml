@@ -41,6 +41,10 @@
                 <p class="section-label">Try it</p>
                 <pre class="code" id="new-token-example">curl -H "X-Api-Key: @Model.NewToken" "@baseUrl/api/v1/translations/@CultureWay.DefaultCulture"</pre>
             </div>
+            @if (Model.OpenApiEnabled)
+            {
+                <p class="muted">Or paste the key into the <a href="~/api-reference/">API reference</a> and send requests from the browser.</p>
+            }
         </div>
     </div>
 }

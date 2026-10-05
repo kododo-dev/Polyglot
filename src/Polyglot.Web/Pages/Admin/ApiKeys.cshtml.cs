@@ -35,6 +35,8 @@ public class ApiKeysModel(ApiKeyService keys, ApiOptions api, DemoOptions demo) 
 
     public bool ApiEnabled => api.Enabled;
 
+    public bool OpenApiEnabled => api.Enabled && api.OpenApi.Enabled;
+
     public DateTimeOffset Now { get; } = DateTimeOffset.UtcNow;
 
     public async Task OnGetAsync() => Keys = await keys.ListAsync(HttpContext.RequestAborted);

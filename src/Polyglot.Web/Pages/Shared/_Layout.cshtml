@@ -3,6 +3,7 @@
 @using Kododo.Polyglot.Web.Pages.Shared
 @using System.Security.Claims
 @inject PolyglotOptions Polyglot
+@inject Kododo.Polyglot.Web.Demo.DemoOptions Demo
 @{
     var title = ViewData["Title"] as string;
     var bare = ViewData["Bare"] is true;
@@ -73,6 +74,10 @@ else
         </aside>
         <div class="backdrop" data-menu-toggle></div>
         <div class="main">
+            @if (Demo.Enabled)
+            {
+                <div class="demo-banner" role="note">@Icons.Get("info") <span>@Demo.Notice</span></div>
+            }
             <header class="topbar">
                 <button class="icon-btn menu-button" type="button" data-menu-toggle aria-label="Open menu">@Icons.Get("menu")</button>
                 <h1>@title</h1>

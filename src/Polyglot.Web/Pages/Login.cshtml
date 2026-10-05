@@ -15,6 +15,16 @@
         <div class="alert alert-error" role="alert">@Icons.Get("alert")<div><p>@Model.Error</p></div></div>
     }
 
+    @if (Model.Demo.Enabled)
+    {
+        <div class="alert alert-warn" role="status">@Icons.Get("info")<div><p>@Model.Demo.Notice</p></div></div>
+        <form method="post" asp-page-handler="Demo" asp-route-returnUrl="@Model.ReturnUrl">
+            <button class="btn btn-primary btn-block" type="submit">Try the demo</button>
+        </form>
+        <p class="hint demo-credentials">Or sign in below as <code>@Model.Demo.Username</code> with the password <code>@Model.Demo.Password</code>.</p>
+        <div class="divider">or</div>
+    }
+
     @if (Model.LocalEnabled)
     {
         <form class="form" method="post" asp-route-returnUrl="@Model.ReturnUrl">

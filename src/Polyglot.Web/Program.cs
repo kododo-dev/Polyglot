@@ -4,6 +4,7 @@ using Kododo.CultureWay.UI;
 using Kododo.Polyglot.Web;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
+using Kododo.Polyglot.Web.Demo;
 using Kododo.Polyglot.Web.History;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,12 +15,16 @@ var auth = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOpt
            ?? new AuthOptions();
 var api = builder.Configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>()
           ?? new ApiOptions();
+var demo = builder.Configuration.GetSection(DemoOptions.SectionName).Get<DemoOptions>()
+           ?? new DemoOptions();
 var connectionString = builder.Configuration.GetConnectionString("Default");
 var cultures = polyglot.GetCultures();
 var editorPath = polyglot.GetEditorPath();
 
+demo.Apply(auth);
 auth.Validate(connectionString);
 api.Validate();
+demo.Validate(auth);
 
 // The API needs keys, which need the admin UI to issue and revoke them.
 var apiEnabled = api.Enabled && auth.Enabled;
@@ -27,6 +32,7 @@ var apiEnabled = api.Enabled && auth.Enabled;
 builder.Services.AddSingleton(polyglot);
 builder.Services.AddSingleton(auth);
 builder.Services.AddSingleton(api);
+builder.Services.AddSingleton(demo);
 builder.Services.AddHealthChecks();
 
 builder.Services.AddCultureWay(x =>
@@ -64,6 +70,9 @@ else
         "Authentication is disabled (Polyglot:Auth:Enabled=false). Anyone who can reach this instance can edit translations.");
 
 await app.InitializeCultureWayAsync();
+
+if (demo.Enabled)
+    await app.SeedDemoAsync(demo, apiEnabled);
 
 if (api.Enabled && !auth.Enabled)
     app.Logger.LogWarning(

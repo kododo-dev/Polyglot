@@ -1,6 +1,7 @@
 @page "/"
 @model IndexModel
 @using Kododo.Polyglot.Web.Pages.Shared
+@inject Kododo.Polyglot.Web.Demo.DemoOptions Demo
 @{
     ViewData["Title"] = "Overview";
     var isAdmin = User.IsInRole(nameof(UserRole.Admin));
@@ -58,4 +59,9 @@ else
             </div>
         </div>
     </div>
+
+    @if (Demo.Enabled && Model.ApiEnabled)
+    {
+        <partial name="_DemoApiKey" />
+    }
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
+using Kododo.Polyglot.Web.Demo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -8,7 +9,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Kododo.Polyglot.Web.Pages;
 
 [Authorize]
-public class AccountModel(UserService users) : PageModel
+[DemoReadOnly]
+public class AccountModel(UserService users, DemoOptions demo) : PageModel
 {
     public class PasswordInput
     {
@@ -28,6 +30,9 @@ public class AccountModel(UserService users) : PageModel
     public bool HasPassword { get; private set; }
 
     public string[] Errors { get; private set; } = [];
+
+    /// <summary>Everyone shares the demo account, so its password stays the published one.</summary>
+    public bool IsDemo => demo.Enabled;
 
     public async Task<IActionResult> OnGetAsync() => await LoadAsync() ? Page() : Forbid();
 

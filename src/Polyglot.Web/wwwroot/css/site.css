@@ -394,6 +394,23 @@ select.compact { width: auto; padding: 4px 8px; font-size: .78rem; }
 .empty > .icon { width: 28px; height: 28px; color: var(--faint); margin-bottom: 8px; }
 .empty p { margin: 0 0 12px; }
 
+/* ── History ───────────────────────────────────────────────────── */
+
+/* One row on a wide screen, wrapping on a narrow one; the key field gets the most room. */
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+.filters .field { flex: 1 1 130px; }
+.filters .field:first-child { flex-grow: 2; }
+/* As tall as the inputs next to them. */
+.filters .btn { padding-block: 8px; font-size: .82rem; }
+.table a.name { color: inherit; text-decoration: none; }
+.table a.name:hover { color: var(--accent); text-decoration: underline; }
+.table td.change { max-width: 420px; }
+.change-old, .change-new { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.change-old { color: var(--danger); background: var(--danger-soft); text-decoration: line-through; }
+.change-new { color: var(--ok); background: var(--ok-soft); }
+.change .badge { margin-bottom: 4px; }
+.pager { justify-content: center; margin-top: 16px; }
+
 /* ── Dialogs ───────────────────────────────────────────────────── */
 
 dialog.dialog {

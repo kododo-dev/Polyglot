@@ -1,0 +1,126 @@
+@page "/history"
+@model HistoryModel
+@using Kododo.Polyglot.Web.Pages.Shared
+@{
+    ViewData["Title"] = "History";
+
+    static string Short(string value) => value.Length > 80 ? value[..80] + "…" : value;
+}
+
+<partial name="_Alerts" model="new Alerts(Model.Message, Model.Errors)" />
+
+<form class="filters" method="get" role="search">
+    <div class="field">
+        <label for="key">Key</label>
+        <input id="key" type="text" name="key" value="@Model.Key" placeholder="Part of a key" autocomplete="off">
+    </div>
+    <div class="field">
+        <label for="culture">Language</label>
+        <select id="culture" name="culture">
+            <option value="">All</option>
+            @foreach (var culture in Model.Cultures)
+            {
+                <option value="@culture" selected="@(culture == Model.Culture)">@culture</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="user">Changed by</label>
+        <select id="user" name="user">
+            <option value="">Anyone</option>
+            @foreach (var (id, name) in Model.Users)
+            {
+                <option value="@id" selected="@(id == Model.UserId)">@name</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="from">From (UTC)</label>
+        <input id="from" type="date" name="from" value="@HistoryModel.Day(Model.From)">
+    </div>
+    <div class="field">
+        <label for="to">To (UTC)</label>
+        <input id="to" type="date" name="to" value="@HistoryModel.Day(Model.To)">
+    </div>
+    <div class="actions">
+        <button class="btn btn-primary" type="submit">Filter</button>
+        @if (Model.IsFiltered)
+        {
+            <a class="btn btn-ghost" asp-page="/History">Clear</a>
+        }
+    </div>
+</form>
+
+<div class="panel">
+    @if (Model.Changes.Count == 0)
+    {
+        <div class="empty">
+            @Icons.Get("history")
+            <p>@(Model.IsFiltered ? "No changes match these filters." : "No changes yet. Every change saved in the editor shows up here.")</p>
+        </div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+            <tr><th>Translation</th><th>Change</th><th>By</th><th>When</th><th><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var change in Model.Changes)
+            {
+                <tr>
+                    <td>
+                        <a class="name" asp-page="/History" asp-route-key="@change.Key">@change.Key</a>
+                        <span class="sub">@change.Culture</span>
+                    </td>
+                    <td data-label="Change" class="change">
+                        @if (change.OldValue is null)
+                        {
+                            <span class="badge ok">added</span>
+                            <span class="change-new">@change.NewValue</span>
+                        }
+                        else if (change.NewValue is null)
+                        {
+                            <span class="badge danger">removed</span>
+                            <del class="change-old">@change.OldValue</del>
+                        }
+                        else
+                        {
+                            <del class="change-old">@change.OldValue</del>
+                            <span class="change-new">@change.NewValue</span>
+                        }
+                    </td>
+                    <td data-label="By">@change.UserName</td>
+                    <td data-label="When" class="num"><partial name="_Time" model="(DateTimeOffset?)change.ChangedAt" /></td>
+                    <td class="actions-cell">
+                        <form method="post" asp-page-handler="Undo"
+                              asp-route-key="@Model.Key" asp-route-culture="@Model.Culture" asp-route-user="@Model.UserId"
+                              asp-route-from="@HistoryModel.Day(Model.From)" asp-route-to="@HistoryModel.Day(Model.To)"
+                              data-confirm="@(change.OldValue is null
+                                  ? $"Remove '{change.Key}' ({change.Culture})? This change added it."
+                                  : $"Set '{change.Key}' ({change.Culture}) back to \"{Short(change.OldValue)}\"? Any later change to it is replaced.")"
+                              data-confirm-action="Undo">
+                            <input type="hidden" name="id" value="@change.Id">
+                            <button class="btn" type="submit">Undo</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (Model.Before is not null || Model.OlderThan is not null)
+{
+    <div class="actions pager">
+        @if (Model.Before is not null)
+        {
+            <a class="btn" href="@Url.Page("/History", Model.Query())">Newest</a>
+        }
+        @if (Model.OlderThan is not null)
+        {
+            <a class="btn" href="@Url.Page("/History", Model.Query(Model.OlderThan))">Older changes</a>
+        }
+    </div>
+}

@@ -12,6 +12,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
+    public DbSet<TranslationChange> TranslationChanges => Set<TranslationChange>();
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -41,6 +43,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(k => k.Name).HasMaxLength(200).IsRequired();
             e.Property(k => k.Scopes).HasMaxLength(200).IsRequired();
             e.HasIndex(k => k.KeyId).IsUnique();
+        });
+
+        modelBuilder.Entity<TranslationChange>(e =>
+        {
+            e.ToTable("translation_changes");
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).UseIdentityAlwaysColumn();
+            e.Property(c => c.Key).IsRequired();
+            e.Property(c => c.Culture).IsRequired();
+            e.Property(c => c.UserName).HasMaxLength(200).IsRequired();
         });
 
         modelBuilder.Entity<DataProtectionKey>().ToTable("data_protection_keys");

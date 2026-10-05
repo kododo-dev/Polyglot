@@ -97,6 +97,12 @@ Any OIDC provider works (Keycloak, Entra ID, Authentik, Google, ...). The app us
 
 Users are created on their first sign-in. To use OIDC only, set `Polyglot__Auth__Local__Enabled=false` together with `AdminGroup` (so that someone can administer the instance).
 
+### History
+
+Every change to a translation is recorded with its old and new value, who made it and when. Editors and administrators see the history at `/history`, can filter it by key, language, user or the days of the change (in UTC), and can undo a change. An undo sets the translation back to its value before that change, and is recorded as a change of its own.
+
+The history is kept in the database next to the users, so it needs authentication to be enabled. Nothing is removed from it yet.
+
 ### Delivery API
 
 A read-only HTTP API from which consuming apps fetch their translations. It authenticates with API keys, which administrators issue at `/admin/api-keys`. A new key is shown once, when it is created. Requires authentication to be enabled.
@@ -157,7 +163,7 @@ Pushing a `v*` tag (for example `v0.1.0`) runs CI and then publishes the image t
 2. ~~API keys and a delivery API for consuming apps, with an OpenAPI document for generating
    clients ([docs/delivery-api.md](docs/delivery-api.md)).~~
 3. ~~A published Docker image, so Polyglot can be run without building it from source.~~
-4. Statuses, history, import and export.
+4. History, import and export.
 5. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
 6. AI help with translation: connect an AI model that suggests translations into other languages.
 

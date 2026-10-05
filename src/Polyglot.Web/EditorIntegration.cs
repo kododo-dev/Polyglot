@@ -10,6 +10,9 @@ namespace Kododo.Polyglot.Web;
 /// </summary>
 public static class EditorIntegration
 {
+    // Not in EditorLinkIcons yet: until CultureWay knows it, the editor shows its default link icon.
+    private const string HistoryIcon = "history";
+
     public static void Configure(EditorOptions editor, PolyglotOptions polyglot, bool authEnabled)
     {
         editor.Title = "Polyglot";
@@ -44,7 +47,10 @@ public static class EditorIntegration
         if (isAdmin)
             links.Add(new EditorLink("Overview", $"{pathBase}/") { Icon = EditorLinkIcons.Home });
         if (isAdmin || isEditor)
+        {
             links.Add(new EditorLink("Translations", $"{pathBase}{polyglot.GetEditorPath()}/") { Icon = EditorLinkIcons.Translations });
+            links.Add(new EditorLink("History", $"{pathBase}/history") { Icon = HistoryIcon });
+        }
         if (isAdmin)
         {
             links.Add(new EditorLink("Users", $"{pathBase}/admin/users") { Icon = EditorLinkIcons.Users });

@@ -1,0 +1,29 @@
+@using Kododo.Polyglot.Web.Pages.Shared
+@inject Kododo.Polyglot.Web.Demo.DemoOptions Demo
+@inject Kododo.CultureWay.CultureWayOptions CultureWay
+@{
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{Context.Request.PathBase}";
+    var culture = CultureWay.SupportedCultures.FirstOrDefault(c => c != CultureWay.DefaultCulture) ?? CultureWay.DefaultCulture;
+}
+@* The demo's key is public, so it can be shown here, unlike any real one. *@
+<div class="panel">
+    <div class="panel-head">
+        <h2>Try the delivery API</h2>
+        <span class="badge accent">demo key</span>
+    </div>
+    <div class="panel-body form">
+        <p class="lead">This key belongs to the demo and works for everyone. Change a translation in the editor and call the API again to see the new value.</p>
+        <div class="token">
+            <code id="demo-token">@Demo.ApiKey</code>
+            <button class="btn" type="button" data-copy="demo-token">@Icons.Get("copy") <span data-label>Copy</span></button>
+        </div>
+        <div>
+            <p class="section-label">Languages</p>
+            <pre class="code">curl -H "X-Api-Key: @Demo.ApiKey" "@baseUrl/api/v1/cultures"</pre>
+        </div>
+        <div>
+            <p class="section-label">Translations, only the Checkout namespace</p>
+            <pre class="code">curl -H "X-Api-Key: @Demo.ApiKey" "@baseUrl/api/v1/translations/@culture?namespace=Checkout"</pre>
+        </div>
+    </div>
+</div>

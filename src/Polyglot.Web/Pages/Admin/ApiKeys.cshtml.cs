@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
+using Kododo.Polyglot.Web.Demo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -9,7 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Kododo.Polyglot.Web.Pages.Admin;
 
 [Authorize(Policy = PolyglotPolicies.Admin)]
-public class ApiKeysModel(ApiKeyService keys, ApiOptions api) : PageModel
+public class ApiKeysModel(ApiKeyService keys, ApiOptions api, DemoOptions demo) : PageModel
 {
     public class CreateInput
     {
@@ -63,11 +64,20 @@ public class ApiKeysModel(ApiKeyService keys, ApiOptions api) : PageModel
 
     public async Task<IActionResult> OnPostDisabledAsync(Guid id, bool disabled)
         => await ApplyAsync(
-            await keys.SetDisabledAsync(id, disabled, HttpContext.RequestAborted),
+            await DemoKeyErrorsAsync(id) ?? await keys.SetDisabledAsync(id, disabled, HttpContext.RequestAborted),
             disabled ? "API key disabled." : "API key enabled.");
 
     public async Task<IActionResult> OnPostDeleteAsync(Guid id)
-        => await ApplyAsync(await keys.DeleteAsync(id, HttpContext.RequestAborted), "API key deleted.");
+        => await ApplyAsync(
+            await DemoKeyErrorsAsync(id) ?? await keys.DeleteAsync(id, HttpContext.RequestAborted), "API key deleted.");
+
+    public bool IsDemoKey(ApiKey key) => demo.IsDemoKey(key);
+
+    // The key the demo shows has to keep working for the next visitor.
+    private async Task<string[]?> DemoKeyErrorsAsync(Guid id)
+        => demo.Enabled && await keys.FindByIdAsync(id, HttpContext.RequestAborted) is { } key && demo.IsDemoKey(key)
+            ? ["The demo's own key cannot be disabled or deleted. Create a key of your own to try that."]
+            : null;
 
     private async Task<IActionResult> ApplyAsync(string[] errors, string success)
     {

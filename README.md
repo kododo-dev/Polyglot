@@ -132,6 +132,21 @@ npx @openapitools/openapi-generator-cli generate \
 
 Design notes: [docs/delivery-api.md](docs/delivery-api.md).
 
+### Public demo
+
+Runs an instance as a public demo. On its first start it creates the demo administrator, a few translators, the translations of a made-up shop in English, Polish and German (with some German ones missing), a history of their changes, and an API key. The sign-in page gets a "Try the demo" button, and every page a notice.
+
+So that one visitor cannot spoil the demo for the next, users cannot be added or changed, the demo account's password cannot be changed, and the demo's API key cannot be disabled or deleted. Everything else works, including the editor, the history and new API keys.
+
+The demo does not reset itself. Give it a database that is recreated on a schedule, for example PostgreSQL on a `tmpfs` restarted every night.
+
+| Variable | Default | Description |
+|---|---|---|
+| `Polyglot__Demo__Enabled` | `false` | Turns the demo on. Needs local sign-in. |
+| `Polyglot__Demo__Username` / `Password` | `demo` / `polyglot-demo` | The demo administrator, shown on the sign-in page. |
+| `Polyglot__Demo__ApiKey` | a fixed public token | The demo's API key, shown with example `curl` calls on the overview and API keys pages. |
+| `Polyglot__Demo__Notice` | a generic notice | Shown on every page. Say here when the data is reset. |
+
 ## Development
 
 ```bash

@@ -3,6 +3,7 @@
 @using Kododo.Polyglot.Web.Auth
 @using Kododo.Polyglot.Web.Pages.Shared
 @inject Kododo.CultureWay.CultureWayOptions CultureWay
+@inject Kododo.Polyglot.Web.Demo.DemoOptions Demo
 @{
     ViewData["Title"] = "API keys";
     var createFailed = Model.Errors.Length > 0 && string.Equals(Request.Query["handler"], "Create", StringComparison.OrdinalIgnoreCase);
@@ -46,6 +47,11 @@
 
 <partial name="_Alerts" model="new Alerts(Model.Message, createFailed ? [] : Model.Errors)" />
 
+@if (Demo.Enabled && Model.ApiEnabled)
+{
+    <partial name="_DemoApiKey" />
+}
+
 <div class="panel">
     @if (Model.Keys.Count == 0)
     {
@@ -68,6 +74,7 @@
                 <tr>
                     <td>
                         <span class="name">@key.Name</span>
+                        @if (Model.IsDemoKey(key)) { <span class="badge accent">demo</span> }
                         <code class="sub">@(ApiKeyService.TokenPrefix + key.KeyId)_…</code>
                     </td>
                     <td data-label="Status">
@@ -77,21 +84,24 @@
                     <td data-label="Last used" class="num"><partial name="_Time" model="key.LastUsedAt" /></td>
                     <td data-label="Expires" class="num"><partial name="_Time" model="key.ExpiresAt" /></td>
                     <td class="actions-cell">
-                        <div class="actions">
-                            <form method="post" asp-page-handler="Disabled"
-                                  data-confirm="@(key.IsDisabled ? $"Enable the key '{key.Name}'? Apps using it get access again." : $"Disable the key '{key.Name}'? Apps using it lose access until it is enabled again.")"
-                                  data-confirm-action="@(key.IsDisabled ? "Enable" : "Disable")">
-                                <input type="hidden" name="id" value="@key.Id">
-                                <input type="hidden" name="disabled" value="@((!key.IsDisabled).ToString().ToLowerInvariant())">
-                                <button class="btn" type="submit">@(key.IsDisabled ? "Enable" : "Disable")</button>
-                            </form>
-                            <form method="post" asp-page-handler="Delete"
-                                  data-confirm="Delete the key '@key.Name'? Apps using it lose access, and this cannot be undone."
-                                  data-confirm-action="Delete key" data-confirm-danger>
-                                <input type="hidden" name="id" value="@key.Id">
-                                <button class="btn btn-danger" type="submit">Delete</button>
-                            </form>
-                        </div>
+                        @if (!Model.IsDemoKey(key))
+                        {
+                            <div class="actions">
+                                <form method="post" asp-page-handler="Disabled"
+                                      data-confirm="@(key.IsDisabled ? $"Enable the key '{key.Name}'? Apps using it get access again." : $"Disable the key '{key.Name}'? Apps using it lose access until it is enabled again.")"
+                                      data-confirm-action="@(key.IsDisabled ? "Enable" : "Disable")">
+                                    <input type="hidden" name="id" value="@key.Id">
+                                    <input type="hidden" name="disabled" value="@((!key.IsDisabled).ToString().ToLowerInvariant())">
+                                    <button class="btn" type="submit">@(key.IsDisabled ? "Enable" : "Disable")</button>
+                                </form>
+                                <form method="post" asp-page-handler="Delete"
+                                      data-confirm="Delete the key '@key.Name'? Apps using it lose access, and this cannot be undone."
+                                      data-confirm-action="Delete key" data-confirm-danger>
+                                    <input type="hidden" name="id" value="@key.Id">
+                                    <button class="btn btn-danger" type="submit">Delete</button>
+                                </form>
+                            </div>
+                        }
                     </td>
                 </tr>
             }

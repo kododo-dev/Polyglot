@@ -84,6 +84,32 @@ public sealed class ApiKeyService(AppDbContext db)
         return (key, TokenPrefix + keyId + "_" + secret, []);
     }
 
+    /// <summary>
+    /// Registers a key whose token the caller already has, such as the demo's published one. The
+    /// secret was not generated here, so use this only for tokens that are meant to be public.
+    /// </summary>
+    public async Task<ApiKey> RegisterAsync(
+        string name, string token, Guid? createdByUserId = null, CancellationToken ct = default)
+    {
+        if (!TryParse(token, out var keyId, out var secret))
+            throw new ArgumentException("Not a valid API key token.", nameof(token));
+
+        var key = new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            KeyId = keyId,
+            SecretHash = HashSecret(secret),
+            Name = name.Trim(),
+            Scopes = ReadScope,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        db.ApiKeys.Add(key);
+        await db.SaveChangesAsync(ct);
+        return key;
+    }
+
     public Task<ApiKey?> ValidateAsync(string token, CancellationToken ct = default)
         => ValidateAsync(token, DateTimeOffset.UtcNow, ct);
 

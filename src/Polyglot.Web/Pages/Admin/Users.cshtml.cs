@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
+using Kododo.Polyglot.Web.Demo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -8,7 +9,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Kododo.Polyglot.Web.Pages.Admin;
 
 [Authorize(Policy = PolyglotPolicies.Admin)]
-public class UsersModel(UserService users) : PageModel
+[DemoReadOnly]
+public class UsersModel(UserService users, DemoOptions demo) : PageModel
 {
     public class CreateInput
     {
@@ -28,6 +30,9 @@ public class UsersModel(UserService users) : PageModel
     public IReadOnlyList<User> Users { get; private set; } = [];
 
     public string[] Errors { get; private set; } = [];
+
+    /// <summary>In the demo the users can be looked at, not changed.</summary>
+    public bool ReadOnly => demo.Enabled;
 
     /// <summary>Admins cannot lock themselves out: their own row has no role or disable controls.</summary>
     public Guid? CurrentUserId

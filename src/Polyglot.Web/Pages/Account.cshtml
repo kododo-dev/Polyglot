@@ -19,7 +19,11 @@
     </div>
 </div>
 
-@if (Model.HasPassword)
+@if (Model.IsDemo)
+{
+    <div class="alert alert-warn" role="status">@Icons.Get("info")<div><p>Changing the password is turned off in the demo, since every visitor signs in with this account.</p></div></div>
+}
+else if (Model.HasPassword)
 {
     <div class="panel">
         <div class="panel-head"><h2>Change password</h2></div>

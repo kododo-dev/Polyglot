@@ -58,7 +58,7 @@ public sealed class DeliveryApiTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ValidKey_GetsTheCulturesWithAVersionAndAnETag()
+    public async Task ValidKey_GetsTheCulturesWithAnETag()
     {
         var factory = await CreateAppAsync();
         var client = NewClient(factory, await IssueKeyAsync(factory));
@@ -70,9 +70,8 @@ public sealed class DeliveryApiTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal("pl", body.GetProperty("defaultCulture").GetString());
         Assert.Equal(["de", "en", "pl"], body.GetProperty("cultures").EnumerateArray().Select(c => c.GetString()));
 
-        var version = body.GetProperty("version").GetString();
-        Assert.Matches("^[0-9a-f]{16}$", version);
-        Assert.Equal($"\"{version}\"", response.Headers.ETag?.ToString());
+        Assert.False(body.TryGetProperty("version", out _));
+        Assert.Matches("^\"[0-9a-f]{16}\"$", response.Headers.ETag?.ToString());
         Assert.Contains("no-cache", response.Headers.CacheControl?.ToString());
     }
 
@@ -261,7 +260,6 @@ public sealed class DeliveryApiTests(PostgresFixture postgres) : IAsyncLifetime
         var apiClient = NewClient(factory, await IssueKeyAsync(factory));
 
         var before = await apiClient.GetAsync("/api/v1/cultures");
-        var beforeBody = await before.Content.ReadFromJsonAsync<JsonElement>();
 
         var editor = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -286,7 +284,6 @@ public sealed class DeliveryApiTests(PostgresFixture postgres) : IAsyncLifetime
         var afterBody = await after.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(["de", "en", "fr", "pl"], afterBody.GetProperty("cultures").EnumerateArray().Select(c => c.GetString()));
-        Assert.NotEqual(beforeBody.GetProperty("version").GetString(), afterBody.GetProperty("version").GetString());
         Assert.NotEqual(before.Headers.ETag?.ToString(), after.Headers.ETag?.ToString());
     }
 

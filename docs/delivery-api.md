@@ -101,13 +101,12 @@ Mounted under `/api/v1`, respecting `Polyglot__PathBase`. Responses are `applica
 
 ```json
 {
-  "version": "3f9a1c2d5e7b8a04",
   "defaultCulture": "en",
   "cultures": ["de", "en", "pl"]
 }
 ```
 
-The list is sorted, so the payload and its version are deterministic. It is read from the live
+The list is sorted, so the payload and its version (the `ETag`) are deterministic. It is read from the live
 `CultureWayOptions`, the same source the editor reads. That source already contains the configured
 `Polyglot__Cultures`, cultures the store persisted in an earlier run, and cultures added while the
 instance runs. `defaultCulture` is resolved the same way the editor resolves it.
@@ -181,8 +180,7 @@ read-only source today, but the delivery API must agree with the editor if one i
 ## Caching and change detection
 
 - The version is the first 16 hex characters of a SHA-256 over the response content (sorted
-  entries). `GET /api/v1/cultures` also includes it in the body as `version`. The translations
-  response has it only in the header.
+  entries). It is only in the header, never in the body.
 - It is sent as a strong ETag: `ETag: "a71b0ce4425d9f18"`.
 - `If-None-Match` with a matching value returns `304` with no body.
 - `Cache-Control: no-cache`. Clients always revalidate, and a shared proxy never serves a stale

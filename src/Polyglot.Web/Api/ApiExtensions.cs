@@ -88,7 +88,7 @@ public static class ApiExtensions
                 var version = ContentVersion.Of([cultures.DefaultCulture, .. supported]);
 
                 return ConditionalResponse.Json(
-                    http, version, new CulturesResponse(version, cultures.DefaultCulture, supported));
+                    http, version, new CulturesResponse(cultures.DefaultCulture, supported));
             })
             .WithName("getCultures")
             .WithSummary("The cultures this instance serves")

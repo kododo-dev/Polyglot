@@ -9,6 +9,29 @@ A live demo is available at [kododo.dev/polyglot/demo](https://kododo.dev/polygl
 
 > Early development.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/editor-dark.png">
+  <img alt="The translation editor: keys grouped by namespace, one column per language" src="docs/images/editor-light.png">
+</picture>
+
+<table>
+  <tr>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/history-dark.png">
+        <img alt="The history of changes, with a diff and an undo button for each" src="docs/images/history-light.png">
+      </picture>
+    </td>
+    <td width="50%">
+      <img alt="The API reference sending a request with the demo key and showing the JSON response" src="docs/images/api-client.png">
+    </td>
+  </tr>
+  <tr>
+    <td>Every change is recorded and can be undone.</td>
+    <td>Apps read plain JSON. Try it in the built-in API reference.</td>
+  </tr>
+</table>
+
 ## Quick start
 
 Polyglot is published as `ghcr.io/kododo-dev/polyglot` for `linux/amd64` and `linux/arm64`. Save this as `compose.yaml`:

@@ -282,8 +282,13 @@ committed copy differs, so CI fails on a stale copy. Running the tests with
 `Program` without a database, authentication then refuses to start, and the delivery API is never
 mapped.
 
-An interactive UI (Scalar, Swagger UI) is not part of ASP.NET Core's OpenAPI support and is out of
-scope. Generators only need the document URL.
+Generators only need the document URL. For people, `/api-reference/` serves an interactive reference
+of the same document with Scalar (`Scalar.AspNetCore`), chosen over Swagger UI because it can fill in
+a key (the demo's), shows ready requests in several languages, and fits the rest of the UI. The
+document has no `servers`, so the reference is given this instance's path base on every request;
+without it, requests would miss a sub-path such as `/polyglot/demo`. Everything that would call out of
+the instance is turned off: telemetry, the AI chat, MCP, fonts from a CDN, and the toolbar that shares
+to Scalar's cloud. The reference's scripts ship in the package.
 
 ```bash
 # generate a TypeScript client

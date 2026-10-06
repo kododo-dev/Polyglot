@@ -105,6 +105,7 @@ if (apiEnabled)
     {
         app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
         app.MapOpenApi("/openapi/{documentName}.yaml").AllowAnonymous();
+        app.MapPolyglotApiReference(demo);
     }
 }
 

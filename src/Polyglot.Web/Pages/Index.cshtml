@@ -54,6 +54,7 @@ else
                 <a class="btn" asp-page="/Admin/ApiKeys">@Icons.Get("key") Manage API keys</a>
                 @if (Model.OpenApiEnabled)
                 {
+                    <a class="btn" href="~/api-reference/">Try it in the API reference</a>
                     <a class="btn btn-ghost" href="~/openapi/v1.json">OpenAPI document @Icons.Get("arrow-right")</a>
                 }
             </div>

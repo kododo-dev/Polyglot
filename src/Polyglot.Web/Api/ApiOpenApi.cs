@@ -1,5 +1,7 @@
+using Kododo.Polyglot.Web.Demo;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 
 namespace Kododo.Polyglot.Web.Api;
 
@@ -16,6 +18,9 @@ public static class ApiOpenApi
 
     /// <summary>Generators name the client class after it, e.g. <c>DeliveryApi</c>.</summary>
     public const string Tag = "Delivery";
+
+    /// <summary>Where the interactive reference (Scalar) is served.</summary>
+    public const string ReferencePath = "/api-reference";
 
     public static IServiceCollection AddPolyglotOpenApi(this IServiceCollection services)
         => services.AddOpenApi(DocumentName, o =>
@@ -111,4 +116,35 @@ public static class ApiOpenApi
                 return Task.CompletedTask;
             });
         });
+
+    /// <summary>
+    /// Serves an interactive reference of the document, where a key can be pasted in and requests
+    /// sent from the browser. Public like the document itself: the requests still need a key.
+    /// </summary>
+    public static void MapPolyglotApiReference(this WebApplication app, DemoOptions demo)
+        => app.MapScalarApiReference(ReferencePath, (options, http) =>
+            {
+                // The document has no servers on purpose (see AddPolyglotOpenApi), so the reference is
+                // told where this instance is, path base included.
+                var pathBase = http.Request.PathBase.Value ?? "";
+                options
+                    .WithTitle("Polyglot delivery API")
+                    .AddDocument(DocumentName)
+                    .AddServer(pathBase.Length > 0 ? pathBase : "/")
+                    .WithFavicon($"{pathBase}/favicon.svg")
+                    .AddPreferredSecuritySchemes(SecuritySchemeName)
+                    // A self-hosted instance should not call out to anyone: no telemetry, AI chat,
+                    // MCP, fonts from a CDN, or the toolbar that shares and deploys to Scalar's
+                    // cloud. The reference's own scripts ship in the package.
+                    .HideDeveloperTools()
+                    .DisableTelemetry()
+                    .DisableAgent()
+                    .DisableMcp()
+                    .DisableDefaultFonts();
+
+                // The demo's key is public, so visitors can send requests right away.
+                if (demo.Enabled)
+                    options.AddApiKeyAuthentication(SecuritySchemeName, key => key.Value = demo.ApiKey);
+            })
+            .AllowAnonymous();
 }

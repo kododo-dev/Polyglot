@@ -123,12 +123,14 @@ npx @openapitools/openapi-generator-cli generate \
   -i https://polyglot.example.com/openapi/v1.json -g typescript-fetch -o ./polyglot-client
 ```
 
+To try the API in a browser, open `/api-reference/`. It is an interactive reference ([Scalar](https://scalar.com)) of the same document: paste a key and send requests, or copy a ready request for curl, C# and other languages. It is served without signing in, like the document, and it loads nothing from outside the instance.
+
 | Variable | Default | Description |
 |---|---|---|
 | `Polyglot__Api__Enabled` | `true` | The delivery API. Not mapped when authentication is disabled, because there is then no way to issue or revoke a key. |
 | `Polyglot__Api__RequestsPerMinute` | `120` | Requests allowed per key per minute; requests without a usable key are counted per client address. Excess requests get `429` with `Retry-After`. |
 | `Polyglot__Api__SnapshotCacheSeconds` | `10` | How long the API reuses one read of all translations. `0` reads the database on every request. |
-| `Polyglot__Api__OpenApi__Enabled` | `true` | Serves the OpenAPI document. |
+| `Polyglot__Api__OpenApi__Enabled` | `true` | Serves the OpenAPI document and the API reference. |
 
 Design notes: [docs/delivery-api.md](docs/delivery-api.md).
 
@@ -144,7 +146,7 @@ The demo does not reset itself. Give it a database that is recreated on a schedu
 |---|---|---|
 | `Polyglot__Demo__Enabled` | `false` | Turns the demo on. Needs local sign-in. |
 | `Polyglot__Demo__Username` / `Password` | `demo` / `polyglot-demo` | The demo administrator, shown on the sign-in page. |
-| `Polyglot__Demo__ApiKey` | a fixed public token | The demo's API key, shown with example `curl` calls on the overview and API keys pages. |
+| `Polyglot__Demo__ApiKey` | a fixed public token | The demo's API key, shown with example `curl` calls on the overview and API keys pages, and filled in on the API reference. |
 | `Polyglot__Demo__Notice` | a generic notice | Shown on every page. Say here when the data is reset. |
 
 ## Development

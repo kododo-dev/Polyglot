@@ -209,15 +209,11 @@
     "schemas": {
       "CulturesResponse": {
         "required": [
-          "version",
           "defaultCulture",
           "cultures"
         ],
         "type": "object",
         "properties": {
-          "version": {
-            "type": "string"
-          },
           "defaultCulture": {
             "type": "string"
           },

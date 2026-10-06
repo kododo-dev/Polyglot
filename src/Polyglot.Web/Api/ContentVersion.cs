@@ -5,8 +5,8 @@ namespace Kododo.Polyglot.Web.Api;
 
 /// <summary>
 /// Versions a response by its content: SHA-256 over the canonical parts, shortened to 16 hex
-/// characters. The same value is reported as <c>version</c> and as the ETag, so a client that already
-/// has it can be answered with an empty 304.
+/// characters. It is sent as the ETag, so a client that already has it can be answered with an empty
+/// 304.
 /// </summary>
 public static class ContentVersion
 {

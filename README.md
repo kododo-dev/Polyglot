@@ -1,6 +1,11 @@
 # Polyglot
 
+[![CI](https://github.com/kododo-dev/Polyglot/actions/workflows/ci.yml/badge.svg)](https://github.com/kododo-dev/Polyglot/actions/workflows/ci.yml)
+[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://kododo.dev/polyglot/demo)
+
 Self-hosted translation management for .NET, built on the [CultureWay](https://github.com/kododo-dev/CultureWay) packages. Translations are edited in a web UI with sign-in and roles, and apps read them through a read-only API. It runs as a Docker image on top of your own PostgreSQL.
+
+A live demo is available at [kododo.dev/polyglot/demo](https://kododo.dev/polyglot/demo).
 
 > Early development.
 
@@ -186,4 +191,4 @@ Pushing a `v*` tag (for example `v0.1.0`) runs CI and then publishes the image t
 
 ## License
 
-To be decided.
+[MIT](LICENSE)

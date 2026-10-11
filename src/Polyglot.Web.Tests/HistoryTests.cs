@@ -131,6 +131,36 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task An_import_is_recorded_as_one_change_set_by_the_editor_who_ran_it()
+    {
+        var factory = await CreateAppAsync();
+        await CreateEditorAsync(factory, "anna", "Anna Nowak");
+        var client = await SignInAsync(factory, "anna", EditorPassword);
+        await SaveInEditorAsync(client, [("Checkout.Pay", "pl", "Zapłać")]);
+
+        var file = Convert.ToBase64String(Encoding.UTF8.GetBytes("""
+            { "Checkout.Pay": "Zapłać teraz", "Checkout.Total": "Razem" }
+            """));
+        var body = JsonSerializer.Serialize(new { fileName = "pl.json", contentBase64 = file, culture = "pl", onlyMissing = false });
+        var response = await client.PostAsync(
+            "/translations/api/ApplyImport", new StringContent(body, Encoding.UTF8, "application/json"));
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using (var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(JsonValueKind.Null, result.RootElement.GetProperty("error").ValueKind);
+            Assert.Equal((1, 1), (result.RootElement.GetProperty("added").GetInt32(), result.RootElement.GetProperty("updated").GetInt32()));
+        }
+
+        var imported = (await ChangesAsync(factory)).Skip(1).ToList();
+        Assert.Equal(2, imported.Count);
+        Assert.Single(imported.Select(c => c.ChangeSetId).Distinct());
+        Assert.All(imported, c => Assert.Equal("Anna Nowak", c.UserName));
+        Assert.Contains(imported, c => (c.Key, c.OldValue, c.NewValue) == ("Checkout.Pay", "Zapłać", "Zapłać teraz"));
+        Assert.Equal("Razem", await StoredValueAsync(factory, "Checkout.Total", "pl"));
+    }
+
+    [Fact]
     public async Task Deleting_a_key_records_the_removed_values_only()
     {
         var factory = await CreateAppAsync();

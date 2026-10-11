@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Kododo.CultureWay.Core.Store;
+using Kododo.CultureWay.UI;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
@@ -180,6 +181,24 @@ public sealed partial class DemoTests(PostgresFixture postgres) : IAsyncLifetime
             var keys = await scope.ServiceProvider.GetRequiredService<ApiKeyService>().ListAsync();
             Assert.Equal(2, keys.Count);
             Assert.False(keys.Single(k => k.Id == demoKey.Id).IsDisabled);
+        }
+    }
+
+    [Fact]
+    public async Task Import_IsLimitedToSmallFiles()
+    {
+        var demo = await TryTheDemoAsync(await CreateAppAsync());
+        var regular = await CreateAppAsync(demo: false);
+
+        Assert.Equal(EditorIntegration.DemoMaxImportBytes, await MaxImportBytesAsync(demo));
+        Assert.Equal(new EditorOptions().MaxImportBytes, regular.Services.GetRequiredService<EditorOptions>().MaxImportBytes);
+
+        static async Task<long> MaxImportBytesAsync(HttpClient client)
+        {
+            var response = await client.PostAsync("/translations/api/GetEditorSettings",
+                new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+            using var settings = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return settings.RootElement.GetProperty("maxImportBytes").GetInt64();
         }
     }
 

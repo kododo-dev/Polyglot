@@ -5,14 +5,20 @@ using Kododo.Polyglot.Web.Data;
 namespace Kododo.Polyglot.Web;
 
 /// <summary>
-/// Makes the CultureWay editor part of Polyglot: its title, the menu links, the signed-in user, and
-/// who may add or delete languages.
+/// Makes the CultureWay editor part of Polyglot: its title, the menu links, the signed-in user, who
+/// may add or delete languages, and how large an import may be.
 /// </summary>
 public static class EditorIntegration
 {
-    public static void Configure(EditorOptions editor, PolyglotOptions polyglot, bool authEnabled)
+    /// <summary>The largest file a visitor of the public demo may import.</summary>
+    public const long DemoMaxImportBytes = 100 * 1024;
+
+    public static void Configure(EditorOptions editor, PolyglotOptions polyglot, bool authEnabled, bool demoEnabled = false)
     {
         editor.Title = "Polyglot";
+        // Everyone who may open the editor (editors and admins) may import; the demo keeps files small.
+        if (demoEnabled)
+            editor.MaxImportBytes = DemoMaxImportBytes;
         editor.HomeUrl = string.IsNullOrWhiteSpace(polyglot.PathBase) ? "/" : $"/{polyglot.PathBase.Trim('/')}/";
         if (!authEnabled)
             return;

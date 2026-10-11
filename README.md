@@ -3,7 +3,7 @@
 [![CI](https://github.com/kododo-dev/Polyglot/actions/workflows/ci.yml/badge.svg)](https://github.com/kododo-dev/Polyglot/actions/workflows/ci.yml)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://kododo.dev/polyglot/demo)
 
-Self-hosted translation management for apps on any platform. Translations are edited in a web UI with sign-in and roles, and apps read them as plain JSON through a read-only HTTP API described by an OpenAPI document, so any stack can use them. It runs as a Docker image on top of your own PostgreSQL. Polyglot itself is built on the [CultureWay](https://github.com/kododo-dev/CultureWay) packages.
+Self-hosted translation management for apps on any platform. Translations are edited in a web UI with sign-in and roles, and apps read them as plain JSON through a read-only HTTP API described by an OpenAPI document, so any stack can use them. Translations can be imported and exported as flat JSON or Excel files, for example to hand them to a translator. It runs as a Docker image on top of your own PostgreSQL. Polyglot itself is built on the [CultureWay](https://github.com/kododo-dev/CultureWay) packages.
 
 A live demo is available at [kododo.dev/polyglot/demo](https://kododo.dev/polyglot/demo).
 
@@ -166,7 +166,7 @@ Design notes: [docs/delivery-api.md](docs/delivery-api.md).
 
 Runs an instance as a public demo. On its first start it creates the demo administrator, a few translators, the translations of a made-up shop in English, Polish and German (with some German ones missing), a history of their changes, and an API key. The sign-in page gets a "Try the demo" button, and every page a notice.
 
-So that one visitor cannot spoil the demo for the next, users cannot be added or changed, the demo account's password cannot be changed, and the demo's API key cannot be disabled or deleted. Everything else works, including the editor, the history and new API keys.
+So that one visitor cannot spoil the demo for the next, users cannot be added or changed, the demo account's password cannot be changed, and the demo's API key cannot be disabled or deleted. Everything else works, including the editor, the history and new API keys. Imported files are limited to 100 KB.
 
 The demo does not reset itself. Give it a database that is recreated on a schedule, for example PostgreSQL on a `tmpfs` restarted every night.
 
@@ -208,7 +208,7 @@ Pushing a `v*` tag (for example `v0.1.0`) runs CI and then publishes the image t
 2. ~~API keys and a delivery API for consuming apps, with an OpenAPI document for generating
    clients ([docs/delivery-api.md](docs/delivery-api.md)).~~
 3. ~~A published Docker image, so Polyglot can be run without building it from source.~~
-4. History, import and export.
+4. ~~History, import and export.~~
 5. A .NET client package that plugs a consuming app into Polyglot through `IStringLocalizer`.
 6. AI help with translation: connect an AI model that suggests translations into other languages.
 

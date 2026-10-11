@@ -6,7 +6,11 @@ namespace Kododo.Polyglot.Web.Tests;
 /// <summary>One PostgreSQL container for the whole test run; each test gets its own database.</summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    // Every test has its own database, and Npgsql keeps idle connections pooled per database until the
+    // run ends, so the default limit of 100 connections is soon reached.
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
+        .WithCommand("-c", "max_connections=500")
+        .Build();
 
     public Task InitializeAsync() => _container.StartAsync();
 

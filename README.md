@@ -92,7 +92,7 @@ Everything is configured through environment variables (or `appsettings.json`).
 | `Polyglot__EditorPath` | `/translations` | Path the editor is mounted at. |
 | `Polyglot__PathBase` | empty | Path base when served under a sub-path behind a reverse proxy. |
 
-The container listens on port `8080` and trusts `X-Forwarded-*` headers. `GET /health` returns `200` when the app is up.
+The container listens on port `8080` and trusts `X-Forwarded-*` headers. `GET /health` returns `200` when the app is up, for a liveness probe. `GET /health/ready` also checks that PostgreSQL can be reached and returns `503` when it cannot, for a readiness probe.
 
 ### Authentication
 

@@ -4,8 +4,10 @@ using Kododo.CultureWay.UI;
 using Kododo.Polyglot.Web;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
+using Kododo.Polyglot.Web.Data;
 using Kododo.Polyglot.Web.Demo;
 using Kododo.Polyglot.Web.History;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,7 +35,9 @@ builder.Services.AddSingleton(polyglot);
 builder.Services.AddSingleton(auth);
 builder.Services.AddSingleton(api);
 builder.Services.AddSingleton(demo);
-builder.Services.AddHealthChecks();
+var healthChecks = builder.Services.AddHealthChecks();
+if (!string.IsNullOrWhiteSpace(connectionString))
+    healthChecks.AddCheck("database", new DatabaseHealthCheck(connectionString), tags: ["ready"]);
 
 builder.Services.AddCultureWay(x =>
 {
@@ -87,7 +91,9 @@ if (auth.Enabled)
     app.UseAuthorization();
 }
 
-app.MapHealthChecks("/health");
+// Liveness: the process is up. Readiness: it can also reach the database.
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready");
 
 if (auth.Enabled)
 {

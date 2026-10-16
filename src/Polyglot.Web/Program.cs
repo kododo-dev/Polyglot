@@ -61,7 +61,11 @@ if (apiEnabled)
 var app = builder.Build();
 
 if (!string.IsNullOrWhiteSpace(polyglot.PathBase))
+{
     app.UsePathBase("/" + polyglot.PathBase.Trim('/'));
+    // Routing has to come after the path base is removed; otherwise it is added first and matches the full path.
+    app.UseRouting();
+}
 
 if (string.IsNullOrWhiteSpace(connectionString))
     app.Logger.LogWarning(

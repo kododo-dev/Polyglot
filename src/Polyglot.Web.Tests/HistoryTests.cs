@@ -84,8 +84,7 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
         });
         var response = await client.PostAsync(
             "/translations/api/UpdateTranslations", new StringContent(body, Encoding.UTF8, "application/json"));
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        Assert.Equal("[]", await response.Content.ReadAsStringAsync());
+        Assert.True(response.StatusCode == HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
     }
 
     private static async Task<List<TranslationChange>> ChangesAsync(WebApplicationFactory<Program> factory)

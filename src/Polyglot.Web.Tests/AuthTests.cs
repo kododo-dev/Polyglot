@@ -104,6 +104,27 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UnderPathBase_CanSignInAndUseEditor()
+    {
+        // Routing added implicitly runs before the path base is removed and matches the full path: the pages still
+        // loaded, but every POST under the prefix, the sign-in and the editor's API, got 405.
+        var client = NewClient(await CreateAppAsync(("Polyglot:PathBase", "/polyglot")));
+
+        var token = await GetTokenAsync(client, "/polyglot/login");
+        var login = await client.PostAsync("/polyglot/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Username"] = "admin",
+            ["Password"] = AdminPassword,
+            ["__RequestVerificationToken"] = token,
+        }));
+        var api = await client.PostAsJsonAsync("/polyglot/translations/api/GetCultures", new { });
+
+        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        Assert.Equal("/polyglot/", login.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, api.StatusCode);
+    }
+
+    [Fact]
     public async Task WrongPassword_IsRejected()
     {
         var client = NewClient(await CreateAppAsync());

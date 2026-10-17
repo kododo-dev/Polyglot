@@ -175,17 +175,29 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var client = NewClient(await CreateAppAsync());
         await LoginAsync(client, "admin", AdminPassword);
 
+        var shell = await ShellSettingsAsync(client);
         var settings = await EditorSettingsAsync(client);
 
-        Assert.Equal("Polyglot", settings.GetProperty("title").GetString());
+        Assert.Equal("Polyglot", shell.GetProperty("title").GetString());
         Assert.Equal(
             ["/", "/translations/", "/history", "/admin/users", "/admin/api-keys"],
-            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
         Assert.Equal(
             ["home", "translations", "history", "users", "key"],
-            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
-        Assert.Equal("/logout", settings.GetProperty("user").GetProperty("signOutUrl").GetString());
+            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
+        Assert.Equal("/logout", shell.GetProperty("user").GetProperty("signOutUrl").GetString());
         Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
+    }
+
+    /// <summary>What the editor's page hands to Way.Shell: the title, links and user around the editor.</summary>
+    private static async Task<JsonElement> ShellSettingsAsync(HttpClient client)
+    {
+        var html = await client.GetStringAsync("/translations/");
+        var json = Regex.Match(
+            html, """<script type="application/json" id="way-shell-settings">(.*?)</script>""",
+            RegexOptions.Singleline);
+        Assert.True(json.Success, "The editor's page has no shell settings.");
+        return JsonDocument.Parse(json.Groups[1].Value).RootElement;
     }
 
     [Fact]
@@ -196,14 +208,15 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var client = NewClient(factory);
         await LoginAsync(client, "erin", "erin-password-1");
 
+        var shell = await ShellSettingsAsync(client);
         var settings = await EditorSettingsAsync(client);
         var add = await client.PostAsJsonAsync("/translations/api/AddCulture", new { culture = "fr" });
 
         // Only the editor itself: no overview or admin pages.
         Assert.Equal(
             ["/translations/", "/history"],
-            settings.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
-        Assert.Equal("erin", settings.GetProperty("user").GetProperty("name").GetString());
+            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+        Assert.Equal("erin", shell.GetProperty("user").GetProperty("name").GetString());
         Assert.False(settings.GetProperty("canManageCultures").GetBoolean());
         Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);
     }

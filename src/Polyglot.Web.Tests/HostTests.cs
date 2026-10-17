@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 
@@ -50,6 +51,19 @@ public class HostTests : IClassFixture<WebApplicationFactory<Program>>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task WithoutSignIn_TheEditorIsOpen_OutsideDevelopment()
+    {
+        // Way.Shell answers 403 outside Development until the host decides on the editor's authorization.
+        var client = _factory.WithWebHostBuilder(b => b.UseEnvironment("Production")).CreateClient();
+
+        var page = await client.GetAsync("/translations/");
+        var api = await client.PostAsJsonAsync("/translations/api/GetCultures", new { });
+
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, api.StatusCode);
     }
 
     [Fact]

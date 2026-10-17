@@ -7,6 +7,7 @@ using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
 using Kododo.Polyglot.Web.Demo;
 using Kododo.Polyglot.Web.History;
+using Kododo.Way.Shell;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,11 +40,12 @@ var healthChecks = builder.Services.AddHealthChecks();
 if (!string.IsNullOrWhiteSpace(connectionString))
     healthChecks.AddCheck("database", new DatabaseHealthCheck(connectionString), tags: ["ready"]);
 
+builder.Services.AddWayShell(shell => EditorIntegration.ConfigureShell(shell, polyglot, auth.Enabled));
 builder.Services.AddCultureWay(x =>
 {
     x.Options.SupportedCultures = cultures;
     x.Options.DefaultCulture = polyglot.DefaultCulture.Trim().Length > 0 ? polyglot.DefaultCulture.Trim() : cultures[0];
-    x.AddEditor(editor => EditorIntegration.Configure(editor, polyglot, auth.Enabled, demo.Enabled));
+    x.AddEditor(editor => EditorIntegration.ConfigureEditor(editor, auth.Enabled, demo.Enabled));
     if (!string.IsNullOrWhiteSpace(connectionString))
         x.UsePostgreSQL(connectionString);
 });
@@ -122,6 +124,9 @@ if (apiEnabled)
 var editor = app.UseCultureWay(editorPath);
 if (auth.Enabled)
     editor.RequireAuthorization(PolyglotPolicies.Editor);
+else
+    // Without sign-in anyone may edit, as the warning above says; outside Development the editor otherwise answers 403.
+    editor.AllowAnonymous();
 
 app.Run();
 

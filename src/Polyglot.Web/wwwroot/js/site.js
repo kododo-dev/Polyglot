@@ -3,8 +3,8 @@
 (() => {
   'use strict';
 
-  // ── Theme, shared with the translation editor through the same localStorage key ──
-  const THEME_KEY = 'cultureway.theme';
+  // ── Theme, shared with the translation editor through Way.Shell's localStorage key ──
+  const THEME_KEY = 'way-shell:theme';
   const root = document.documentElement;
 
   // Razor writes data-* attributes for false values too (data-open="False"), so read the value.

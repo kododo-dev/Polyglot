@@ -73,11 +73,11 @@ purpose. Writing it on every request would turn every poll into a database write
 
 ### Management
 
-- `/admin/api-keys` (Admin role) lists the keys (name, `pg_<id>_...`, scopes, created, last used,
+- The **API keys** page (Admin role) lists the keys (name, `pg_<id>_...`, scopes, created, last used,
   expiry, status) and lets an administrator create, disable and delete them. After creation the page
   shows the full token once, with a copy button and a note that it cannot be shown again.
-- The delivery API requires `Polyglot__Auth__Enabled=true`. With authentication off, no Razor pages
-  are mapped, so there is nowhere to create or revoke a key, and the instance may have no database to
+- The delivery API requires `Polyglot__Auth__Enabled=true`. With authentication off, only the editor is
+  mapped, so there is nowhere to create or revoke a key, and the instance may have no database to
   keep keys in. On such an instance the `/api/v1/*` routes are not registered, and a startup warning
   says why.
 - Keys cannot be seeded from configuration. That can be added later without breaking anything. It

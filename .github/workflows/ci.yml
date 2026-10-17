@@ -16,6 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Polyglot.Web/UI/package-lock.json
+
+      # The pages' Way.Shell module, embedded in Polyglot.Web.
+      - name: Lint and build the UI
+        working-directory: src/Polyglot.Web/UI
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:

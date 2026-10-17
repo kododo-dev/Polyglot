@@ -1,3 +1,11 @@
+# The pages' Way.Shell module: plain JavaScript, so it is built once on the builder's platform.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS ui
+WORKDIR /ui
+COPY src/Polyglot.Web/UI/package.json src/Polyglot.Web/UI/package-lock.json ./
+RUN npm ci
+COPY src/Polyglot.Web/UI/ ./
+RUN npm run build
+
 # The SDK stage runs on the builder's platform and cross-compiles for the target one,
 # so the arm64 image is built without emulation.
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -8,6 +16,7 @@ COPY src/Directory.Build.props src/Directory.Packages.props ./
 COPY src/Polyglot.Web/Polyglot.Web.csproj ./Polyglot.Web/
 RUN dotnet restore Polyglot.Web/Polyglot.Web.csproj -a $TARGETARCH
 COPY src/Polyglot.Web/ ./Polyglot.Web/
+COPY --from=ui /ui/dist ./Polyglot.Web/UI/dist/
 RUN dotnet publish Polyglot.Web/Polyglot.Web.csproj \
     --configuration Release \
     --no-restore \

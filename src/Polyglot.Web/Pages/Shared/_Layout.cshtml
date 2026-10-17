@@ -1,18 +1,7 @@
-@using Kododo.Polyglot.Web.Auth
-@using Kododo.Polyglot.Web.Pages.Shared
-@using System.Security.Claims
-@inject PolyglotOptions Polyglot
-@inject Kododo.Polyglot.Web.Demo.DemoOptions Demo
 @{
     var title = ViewData["Title"] as string;
-    var bare = ViewData["Bare"] is true;
-    var currentPage = ViewContext.RouteData.Values["page"] as string;
-    string? Current(string page) => currentPage == page ? "page" : null;
-    var links = EditorIntegration.Links(Context, Polyglot);
-    // The same rule as the editor's: a link is current when it points at this path.
-    static string Trim(string path) => path.TrimEnd('/') is { Length: > 0 } p ? p : "/";
-    bool IsCurrent(string url) => Trim(url) == Trim($"{Context.Request.PathBase}{Context.Request.Path}");
 }
+@* The pages outside the shell: sign-in and access denied. Everything else is a Way of the shell's panel. *@
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,7 +10,7 @@
     <title>@(title is not null ? $"{title} · Polyglot" : "Polyglot")</title>
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml">
     <script>
-        // Before the stylesheet paints: the theme chosen here or in the editor (Way.Shell's key), else the system's.
+        // Before the stylesheet paints: the theme chosen here or in the shell (Way.Shell's key), else the system's.
         (() => {
             let theme = null;
             try { theme = localStorage.getItem('way-shell:theme'); } catch { }
@@ -33,71 +22,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
 </head>
 <body>
-@if (bare)
-{
-    <main class="auth-page">@RenderBody()</main>
-}
-else
-{
-    <div class="shell">
-        <aside class="sidebar" aria-label="Main menu">
-            <div class="sidebar-head">
-                <a class="brand" href="~/">Polyglot</a>
-                <partial name="_ThemeToggle" />
-            </div>
-            @* The editor keeps its namespaces up here; these pages have nothing to put in their place. *@
-            <div class="sidebar-fill"></div>
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                @* Same links, icons and order as at the bottom of the editor's side menu (EditorIntegration.Links). *@
-                <div class="host-menu">
-                    @if (links.Count > 0)
-                    {
-                        <nav class="nav" aria-label="Pages">
-                            @foreach (var link in links)
-                            {
-                                <a class="nav-item" href="@link.Url" aria-current="@(IsCurrent(link.Url) ? "page" : null)">@Icons.Get(link.Icon ?? "arrow-right") @link.Title</a>
-                            }
-                        </nav>
-                        <hr class="host-divider">
-                    }
-                    <div class="user-row">
-                        @Icons.Get("user")
-                        <a class="user" asp-page="/Account" aria-current="@Current("/Account")">@(User.FindFirstValue("display_name") ?? User.Identity.Name)</a>
-                        <form method="post" asp-page="/Logout">
-                            <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">@Icons.Get("logout")</button>
-                        </form>
-                    </div>
-                </div>
-            }
-        </aside>
-        <div class="backdrop" data-menu-toggle></div>
-        <div class="main">
-            @if (Demo.Enabled)
-            {
-                <div class="demo-banner" role="note">@Icons.Get("info") <span>@Demo.Notice</span></div>
-            }
-            <header class="topbar">
-                <button class="icon-btn menu-button" type="button" data-menu-toggle aria-label="Open menu">@Icons.Get("menu")</button>
-                <h1>@title</h1>
-                @await RenderSectionAsync("Actions", required: false)
-            </header>
-            <main class="content">
-                <div class="content-inner">@RenderBody()</div>
-            </main>
-        </div>
-    </div>
-
-    <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
-        <div class="dialog-head" id="confirm-title">Are you sure?</div>
-        <div class="dialog-body"><p data-fill="message"></p></div>
-        <div class="dialog-foot">
-            <button class="btn" type="button" data-close>Cancel</button>
-            <button class="btn btn-primary" type="button" data-confirm-ok>Confirm</button>
-        </div>
-    </dialog>
-}
+<main class="auth-page">@RenderBody()</main>
 <script src="~/js/site.js" asp-append-version="true"></script>
-@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

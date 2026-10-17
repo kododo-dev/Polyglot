@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Kododo.Polyglot.Web.Data;
 
+[JsonConverter(typeof(JsonStringEnumConverter<UserRole>))]
 public enum UserRole
 {
     /// <summary>Signed in but not allowed to do anything (e.g. an OIDC user outside the configured groups).</summary>

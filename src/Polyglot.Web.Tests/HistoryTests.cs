@@ -98,12 +98,13 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
         => (await factory.Services.GetRequiredService<IStore>().GetAllAsync())
             .SingleOrDefault(t => t.Key == key && t.Culture == culture)?.Value;
 
-    private static async Task<HttpResponseMessage> UndoAsync(HttpClient client, long id)
-        => await client.PostAsync("/history?handler=Undo", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["id"] = id.ToString(),
-            ["__RequestVerificationToken"] = await AntiforgeryAsync(client, "/history"),
-        }));
+    private static Task<HttpResponseMessage> UndoAsync(HttpClient client, long id)
+        => WayClient.PostAsync(client, "history", "Undo", new { id });
+
+    /// <summary>The keys of the changes the history lists for <paramref name="query"/>, newest first.</summary>
+    private static async Task<string[]> KeysAsync(HttpClient client, object query)
+        => [.. (await WayClient.GetAsync(client, "history", "History", query)).GetProperty("changes").EnumerateArray()
+            .Select(c => c.GetProperty("key").GetString()!)];
 
     [Fact]
     public async Task A_save_in_the_editor_records_only_the_values_that_changed()
@@ -175,27 +176,23 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
-    public async Task The_history_page_lists_changes_and_filters_them()
+    public async Task The_history_lists_changes_and_filters_them()
     {
         var factory = await CreateAppAsync();
         var client = await SignInAsync(factory);
         await SaveInEditorAsync(client, [("Checkout.Pay", "pl", "Zapłać"), ("Common.Cancel", "en", "Cancel")]);
 
-        var all = await client.GetStringAsync("/history");
-        Assert.Contains("Checkout.Pay", all);
-        Assert.Contains("Common.Cancel", all);
+        Assert.Equal(["Common.Cancel", "Checkout.Pay"], await KeysAsync(client, new { }));
+        Assert.Equal(["Checkout.Pay"], await KeysAsync(client, new { key = "checkout" }));
+        Assert.Equal(["Common.Cancel"], await KeysAsync(client, new { culture = "en" }));
 
-        var byKey = await client.GetStringAsync("/history?key=checkout");
-        Assert.Contains("Checkout.Pay", byKey);
-        Assert.DoesNotContain("Common.Cancel", byKey);
-
-        var byCulture = await client.GetStringAsync("/history?culture=en");
-        Assert.DoesNotContain("Checkout.Pay", byCulture);
-        Assert.Contains("Common.Cancel", byCulture);
+        var options = await WayClient.GetAsync(client, "history", "History");
+        Assert.Equal(["en", "pl"], options.GetProperty("cultures").EnumerateArray().Select(c => c.GetString()));
+        Assert.Equal("admin", Assert.Single(options.GetProperty("users").EnumerateArray()).GetProperty("name").GetString());
     }
 
     [Fact]
-    public async Task The_history_page_filters_by_day_with_both_ends_included()
+    public async Task The_history_filters_by_day_with_both_ends_included()
     {
         var factory = await CreateAppAsync();
         await using (var scope = factory.Services.CreateAsyncScope())
@@ -216,14 +213,7 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
         }
         var client = await SignInAsync(factory);
 
-        var page = await client.GetStringAsync("/history?from=2026-10-01&to=2026-10-02");
-
-        Assert.Contains("Day.First", page);
-        Assert.Contains("Day.Last", page);
-        Assert.DoesNotContain("Day.Before", page);
-        Assert.DoesNotContain("Day.After", page);
-        // The chosen days stay in the form.
-        Assert.Contains("value=\"2026-10-01\"", page);
+        Assert.Equal(["Day.Last", "Day.First"], await KeysAsync(client, new { from = "2026-10-01", to = "2026-10-02" }));
     }
 
     [Fact]
@@ -237,7 +227,7 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
 
         var response = await UndoAsync(client, edit.Id);
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal("Zapłać", await StoredValueAsync(factory, "Checkout.Pay", "pl"));
         var undo = (await ChangesAsync(factory)).Last();
         Assert.Equal(("Płacę", "Zapłać"), (undo.OldValue, undo.NewValue));
@@ -268,8 +258,7 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
 
         var response = await UndoAsync(client, added.Id);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("no longer in Polyglot", await response.Content.ReadAsStringAsync());
+        Assert.Contains("no longer in Polyglot", Assert.Single(await WayClient.ErrorsAsync(response)));
     }
 
     [Fact]
@@ -291,11 +280,13 @@ public sealed partial class HistoryTests(PostgresFixture postgres) : IAsyncLifet
         await CreateEditorAsync(factory, "anna", "Anna Nowak");
 
         var editor = await SignInAsync(factory, "anna", EditorPassword);
-        Assert.Equal(HttpStatusCode.OK, (await editor.GetAsync("/history")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await editor.GetAsync("/history/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await WayClient.PostAsync(editor, "history", "History")).StatusCode);
 
         var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var page = await anonymous.GetAsync("/history");
+        var page = await anonymous.GetAsync("/history/");
         Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
         Assert.Equal("/login", page.Headers.Location?.AbsolutePath);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await WayClient.PostAsync(anonymous, "history", "History")).StatusCode);
     }
 }

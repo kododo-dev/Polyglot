@@ -120,10 +120,12 @@ public sealed partial class DemoTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Contains("polyglot-demo", login);
 
         var client = await TryTheDemoAsync(factory);
-        var overview = await client.GetStringAsync("/");
+        var panel = await client.GetStringAsync("/");
+        var overview = await WayClient.GetAsync(client, "overview", "Overview");
 
-        Assert.Contains("demo-banner", overview);
-        Assert.Contains(DemoOptions.DefaultApiKey, overview);
+        // The notice is the shell's, above every page.
+        Assert.Contains(new DemoOptions().Notice, panel);
+        Assert.Equal(DemoOptions.DefaultApiKey, overview.GetProperty("demoKey").GetProperty("token").GetString());
         Assert.Contains($"\"value\":\"{DemoOptions.DefaultApiKey}\"", await NewClient(factory).GetStringAsync("/api-reference/"));
     }
 
@@ -133,28 +135,27 @@ public sealed partial class DemoTests(PostgresFixture postgres) : IAsyncLifetime
         var factory = await CreateAppAsync();
         var client = await TryTheDemoAsync(factory);
         var before = await CountsAsync(factory);
+        var anna = (await WayClient.GetAsync(client, "users", "Users")).GetProperty("users").EnumerateArray()
+            .Single(u => u.GetProperty("username").GetString() == "anna").GetProperty("id").GetGuid();
 
-        var create = await PostFormAsync(client, "/admin/users", "/admin/users?handler=Create", new()
+        var refused = new[]
         {
-            ["Input.Username"] = "intruder",
-            ["Input.Password"] = "intruder-password-1",
-            ["Input.Role"] = "Admin",
-        });
-        var password = await PostFormAsync(client, "/account", "/account", new()
-        {
-            ["Input.CurrentPassword"] = "polyglot-demo",
-            ["Input.NewPassword"] = "taken-over-password",
-        });
+            await WayClient.PostAsync(client, "users", "CreateUser", new { username = "intruder", password = "intruder-password-1", role = "Admin" }),
+            await WayClient.PostAsync(client, "users", "SetRole", new { id = anna, role = "None" }),
+            await WayClient.PostAsync(client, "users", "SetDisabled", new { id = anna, disabled = true }),
+            await WayClient.PostAsync(client, "users", "ResetPassword", new { id = anna, newPassword = "taken-over-password" }),
+            await WayClient.PostAsync(client, "account", "ChangePassword", new { currentPassword = "polyglot-demo", newPassword = "taken-over-password" }),
+        };
 
-        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, password.StatusCode);
+        Assert.All(refused, r => Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode));
         Assert.Equal(before, await CountsAsync(factory));
         await TryTheDemoAsync(factory); // the published password still works
 
-        // The page shows the users without a single form that would change them.
-        var usersPage = await client.GetStringAsync("/admin/users");
-        Assert.Contains("anna", usersPage);
-        Assert.DoesNotContain("?handler=", usersPage);
+        // The pages say so, and the users can still be looked at.
+        var users = await WayClient.GetAsync(client, "users", "Users");
+        Assert.True(users.GetProperty("readOnly").GetBoolean());
+        Assert.Contains(users.GetProperty("users").EnumerateArray(), u => u.GetProperty("username").GetString() == "anna");
+        Assert.True((await WayClient.GetAsync(client, "account", "Account")).GetProperty("isDemo").GetBoolean());
     }
 
     [Fact]
@@ -166,16 +167,15 @@ public sealed partial class DemoTests(PostgresFixture postgres) : IAsyncLifetime
         await using (var scope = factory.Services.CreateAsyncScope())
             demoKey = (await scope.ServiceProvider.GetRequiredService<ApiKeyService>().ListAsync()).Single();
 
-        var delete = await PostFormAsync(client, "/admin/api-keys", "/admin/api-keys?handler=Delete",
-            new() { ["id"] = demoKey.Id.ToString() });
-        var disable = await PostFormAsync(client, "/admin/api-keys", "/admin/api-keys?handler=Disabled",
-            new() { ["id"] = demoKey.Id.ToString(), ["disabled"] = "true" });
-        var create = await PostFormAsync(client, "/admin/api-keys", "/admin/api-keys?handler=Create",
-            new() { ["Input.Name"] = "my-app" });
+        var delete = await WayClient.PostAsync(client, "api-keys", "DeleteKey", new { id = demoKey.Id });
+        var disable = await WayClient.PostAsync(client, "api-keys", "SetKeyDisabled", new { id = demoKey.Id, disabled = true });
+        var create = await WayClient.PostAsync(client, "api-keys", "CreateKey", new { name = "my-app" });
 
-        Assert.Contains("cannot be disabled or deleted", await delete.Content.ReadAsStringAsync());
-        Assert.Contains("cannot be disabled or deleted", await disable.Content.ReadAsStringAsync());
+        Assert.Contains("cannot be disabled or deleted", Assert.Single(await WayClient.ErrorsAsync(delete)));
+        Assert.Contains("cannot be disabled or deleted", Assert.Single(await WayClient.ErrorsAsync(disable)));
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var listed = (await WayClient.GetAsync(client, "api-keys", "ApiKeys")).GetProperty("keys").EnumerateArray().ToList();
+        Assert.True(listed.Single(k => k.GetProperty("id").GetGuid() == demoKey.Id).GetProperty("isDemo").GetBoolean());
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var keys = await scope.ServiceProvider.GetRequiredService<ApiKeyService>().ListAsync();

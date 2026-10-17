@@ -143,11 +143,13 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var client = NewClient(await CreateAppAsync());
         await LoginAsync(client, "admin", AdminPassword);
 
-        var token = await GetTokenAsync(client, "/account");
-        await client.PostAsync("/logout", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+        await client.PostAsync("/logout", new FormUrlEncodedContent([]));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await CallEditorApiAsync(client)).StatusCode);
+        var panel = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, panel.StatusCode);
+        Assert.Equal("/login", panel.Headers.Location?.AbsolutePath);
     }
 
     [Fact]
@@ -170,7 +172,7 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task EditorSettings_ForAdmin_LinkTheAdminPagesAndAllowLanguageChanges()
+    public async Task Panel_ForAdmin_ListsEveryPage_AndAllowsLanguageChanges()
     {
         var client = NewClient(await CreateAppAsync());
         await LoginAsync(client, "admin", AdminPassword);
@@ -179,24 +181,28 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var settings = await EditorSettingsAsync(client);
 
         Assert.Equal("Polyglot", shell.GetProperty("title").GetString());
+        Assert.Equal("panel", shell.GetProperty("mode").GetString());
         Assert.Equal(
-            ["/", "/translations/", "/history", "/admin/users", "/admin/api-keys"],
-            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+            ["overview", "translations", "history", "users", "api-keys", "account"],
+            shell.GetProperty("ways").EnumerateArray().Select(w => w.GetProperty("id").GetString()));
+        // The account page opens from the user's name, not from the menu.
         Assert.Equal(
-            ["home", "translations", "history", "users", "key"],
-            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("icon").GetString()));
+            ["account"],
+            shell.GetProperty("ways").EnumerateArray().Where(w => w.GetProperty("hidden").GetBoolean()).Select(w => w.GetProperty("id").GetString()));
+        Assert.Empty(shell.GetProperty("links").EnumerateArray());
+        Assert.Equal("/#/account/", shell.GetProperty("user").GetProperty("accountUrl").GetString());
         Assert.Equal("/logout", shell.GetProperty("user").GetProperty("signOutUrl").GetString());
         Assert.True(settings.GetProperty("canManageCultures").GetBoolean());
     }
 
-    /// <summary>What the editor's page hands to Way.Shell: the title, links and user around the editor.</summary>
-    private static async Task<JsonElement> ShellSettingsAsync(HttpClient client)
+    /// <summary>What the panel's page hands to Way.Shell: the title, the pages the user may open and the user.</summary>
+    private static async Task<JsonElement> ShellSettingsAsync(HttpClient client, string url = "/")
     {
-        var html = await client.GetStringAsync("/translations/");
+        var html = await client.GetStringAsync(url);
         var json = Regex.Match(
             html, """<script type="application/json" id="way-shell-settings">(.*?)</script>""",
             RegexOptions.Singleline);
-        Assert.True(json.Success, "The editor's page has no shell settings.");
+        Assert.True(json.Success, "The page has no shell settings.");
         return JsonDocument.Parse(json.Groups[1].Value).RootElement;
     }
 
@@ -212,10 +218,10 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var settings = await EditorSettingsAsync(client);
         var add = await client.PostAsJsonAsync("/translations/api/AddCulture", new { culture = "fr" });
 
-        // Only the editor itself: no overview or admin pages.
+        // The editor, its history and the account page: no overview or admin pages.
         Assert.Equal(
-            ["/translations/", "/history"],
-            shell.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("url").GetString()));
+            ["translations", "history", "account"],
+            shell.GetProperty("ways").EnumerateArray().Select(w => w.GetProperty("id").GetString()));
         Assert.Equal("erin", shell.GetProperty("user").GetProperty("name").GetString());
         Assert.False(settings.GetProperty("canManageCultures").GetBoolean());
         Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);
@@ -241,31 +247,34 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
 
         await LoginAsync(client, "erin", "erin-password-1");
         var api = await CallEditorApiAsync(client);
-        var users = await client.GetAsync("/admin/users");
+        var users = await client.GetAsync("/users/");
+        var usersApi = await WayClient.PostAsync(client, "users", "Users");
 
         Assert.Equal(HttpStatusCode.OK, api.StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, users.StatusCode);
         Assert.Equal("/forbidden", users.Headers.Location?.AbsolutePath);
+        Assert.Equal(HttpStatusCode.Forbidden, usersApi.StatusCode);
     }
 
     [Fact]
-    public async Task Home_SendsEditorsStraightToTheEditor()
+    public async Task Panel_OpensTheEditorFirst_ForEditors()
     {
         var factory = await CreateAppAsync();
         await CreateUserAsync(factory, "erin", "erin-password-1", UserRole.Editor);
         var client = NewClient(factory);
         await LoginAsync(client, "erin", "erin-password-1");
 
-        var home = await client.GetAsync("/");
+        var shell = await ShellSettingsAsync(client);
 
-        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
-        Assert.Equal("/translations/", home.Headers.Location?.OriginalString);
+        // The panel opens the first page of its menu; editors have one place to work, so no overview comes first.
+        var first = shell.GetProperty("ways").EnumerateArray().First(w => !w.GetProperty("hidden").GetBoolean());
+        Assert.Equal("translations", first.GetProperty("id").GetString());
     }
 
     [Theory]
-    [InlineData("Role", "role", "Editor")]
-    [InlineData("Disabled", "disabled", "true")]
-    public async Task Admin_CannotChangeTheirOwnRoleOrDisableThemselves(string handler, string field, string value)
+    [InlineData("SetRole")]
+    [InlineData("SetDisabled")]
+    public async Task Admin_CannotChangeTheirOwnRoleOrDisableThemselves(string request)
     {
         var factory = await CreateAppAsync();
         // A second admin, so the last-admin rule is not what stops the change.
@@ -277,17 +286,9 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
             adminId = (await scope.ServiceProvider.GetRequiredService<UserService>().ListAsync())
                 .Single(u => u.Username == "admin").Id;
 
-        var token = await GetTokenAsync(client, "/admin/users");
-        var response = await client.PostAsync($"/admin/users?handler={handler}", new FormUrlEncodedContent(
-            new Dictionary<string, string>
-            {
-                ["id"] = adminId.ToString(),
-                [field] = value,
-                ["__RequestVerificationToken"] = token,
-            }));
+        var response = await WayClient.PostAsync(client, "users", request, new { id = adminId, role = "Editor", disabled = true });
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("alert-error", await response.Content.ReadAsStringAsync());
+        Assert.Contains("Ask another administrator", Assert.Single(await WayClient.ErrorsAsync(response)));
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var admin = await scope.ServiceProvider.GetRequiredService<UserService>().FindByIdAsync(adminId);
@@ -347,21 +348,17 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var admin = NewClient(factory);
         await LoginAsync(admin, "admin", AdminPassword);
 
-        var token = await GetTokenAsync(admin, "/admin/users");
-        var create = await admin.PostAsync("/admin/users?handler=Create", new FormUrlEncodedContent(
-            new Dictionary<string, string>
-            {
-                ["Input.Username"] = "newbie",
-                ["Input.Password"] = "newbie-password-1",
-                ["Input.Role"] = nameof(UserRole.Editor),
-                ["__RequestVerificationToken"] = token,
-            }));
+        var create = await WayClient.PostAsync(admin, "users", "CreateUser",
+            new { username = "newbie", password = "newbie-password-1", role = nameof(UserRole.Editor) });
 
         var newbie = NewClient(factory);
         await LoginAsync(newbie, "newbie", "newbie-password-1");
 
-        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, create.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await CallEditorApiAsync(newbie)).StatusCode);
+        var users = await WayClient.GetAsync(admin, "users", "Users");
+        var listed = users.GetProperty("users").EnumerateArray().Single(u => u.GetProperty("username").GetString() == "newbie");
+        Assert.Equal("Editor", listed.GetProperty("role").GetString());
     }
 
     [Fact]
@@ -398,22 +395,14 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         var client = NewClient(factory);
         await LoginAsync(client, "admin", AdminPassword);
 
-        async Task<HttpResponseMessage> ChangeAsync(string current, string next)
-        {
-            var token = await GetTokenAsync(client, "/account");
-            return await client.PostAsync("/account", new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["Input.CurrentPassword"] = current,
-                ["Input.NewPassword"] = next,
-                ["__RequestVerificationToken"] = token,
-            }));
-        }
+        Task<HttpResponseMessage> ChangeAsync(string current, string next)
+            => WayClient.PostAsync(client, "account", "ChangePassword", new { currentPassword = current, newPassword = next });
 
         var wrong = await ChangeAsync("wrong-current", "a-brand-new-password");
-        Assert.Contains("current password is incorrect", await wrong.Content.ReadAsStringAsync());
+        Assert.Contains("current password is incorrect", Assert.Single(await WayClient.ErrorsAsync(wrong)));
 
         var ok = await ChangeAsync(AdminPassword, "a-brand-new-password");
-        Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, ok.StatusCode);
 
         var fresh = NewClient(factory);
         Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(fresh, "admin", "a-brand-new-password")).StatusCode);

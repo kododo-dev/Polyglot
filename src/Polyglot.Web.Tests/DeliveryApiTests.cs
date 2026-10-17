@@ -186,7 +186,7 @@ public sealed class DeliveryApiTests(PostgresFixture postgres) : IAsyncLifetime
         var client = NewClient(factory, await IssueKeyAsync(factory));
 
         var editor = await client.PostAsJsonAsync("/translations/api/GetCultures", new { });
-        var admin = await client.GetAsync("/admin/users");
+        var admin = await client.GetAsync("/users/");
 
         Assert.Equal(HttpStatusCode.Unauthorized, editor.StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, admin.StatusCode);

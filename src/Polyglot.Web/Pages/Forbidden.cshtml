@@ -3,11 +3,15 @@
 @{
     ViewData["Title"] = "Access denied";
 }
-<div class="panel">
-    <div class="empty">
+<div class="auth-card">
+    <partial name="_ThemeToggle" />
+    <span class="brand">Polyglot</span>
+    <div class="alert alert-warn" role="status">
         @Icons.Get("lock")
-        <p><strong>Your account is not allowed to open this page.</strong></p>
-        <p>Ask an administrator to change your role.</p>
-        <a class="btn" href="~/">Back to the overview</a>
+        <div>
+            <p><strong>Your account is not allowed to open this page.</strong></p>
+            <p>Ask an administrator to change your role.</p>
+        </div>
     </div>
+    <a class="btn btn-block" href="~/">Back to Polyglot</a>
 </div>

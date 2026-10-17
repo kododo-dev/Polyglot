@@ -41,7 +41,7 @@ public static class AuthExtensions
     public const string LoginRateLimitPolicy = "login";
 
     public static IServiceCollection AddPolyglotAuth(
-        this IServiceCollection services, string connectionString, AuthOptions auth, string editorPath)
+        this IServiceCollection services, string connectionString, AuthOptions auth)
     {
         services.AddDbContext<AppDbContext>(o => o.UseNpgsql(
             connectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations", AppDbContext.Schema)));
@@ -68,9 +68,9 @@ public static class AuthExtensions
             o.ExpireTimeSpan = TimeSpan.FromHours(12);
             o.SlidingExpiration = true;
 
-            // The editor's fetch calls need a status code, not a redirect to an HTML page.
-            o.Events.OnRedirectToLogin = ctx => RedirectOrStatus(ctx, editorPath, StatusCodes.Status401Unauthorized);
-            o.Events.OnRedirectToAccessDenied = ctx => RedirectOrStatus(ctx, editorPath, StatusCodes.Status403Forbidden);
+            // The Ways' API calls need a status code, not a redirect to an HTML page.
+            o.Events.OnRedirectToLogin = ctx => RedirectOrStatus(ctx, StatusCodes.Status401Unauthorized);
+            o.Events.OnRedirectToAccessDenied = ctx => RedirectOrStatus(ctx, StatusCodes.Status403Forbidden);
 
             // Role changes and disabling a user take effect on the next request.
             o.Events.OnValidatePrincipal = async ctx =>
@@ -154,9 +154,13 @@ public static class AuthExtensions
             app.Logger.LogInformation("Created the initial administrator '{Username}'.", admin.Username);
     }
 
-    private static Task RedirectOrStatus(RedirectContext<CookieAuthenticationOptions> ctx, string editorPath, int status)
+    /// <summary>
+    /// Pages get the redirect. The Ways' API is POST only (the shell's client and the editor's), and every other
+    /// POST (sign-in, sign-out) is open to everyone, so a challenged POST is an API call.
+    /// </summary>
+    private static Task RedirectOrStatus(RedirectContext<CookieAuthenticationOptions> ctx, int status)
     {
-        if (ctx.Request.Path.StartsWithSegments($"{editorPath}/api"))
+        if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
             ctx.Response.StatusCode = status;
         else
             ctx.Response.Redirect(ctx.RedirectUri);

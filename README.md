@@ -104,7 +104,7 @@ The container listens on port `8080` and trusts `X-Forwarded-*` headers. `GET /h
 | `Polyglot__Auth__Bootstrap__Password` | generated | Its password. When empty, a random one is generated and logged once. |
 | `Polyglot__Auth__LoginAttemptsPerMinute` | `10` | Sign-in attempts allowed per client address per minute. |
 
-Roles: **Admin** (editor plus user management), **Editor** (translation editor), **None** (signed in, no access). Role changes and disabling a user take effect on the next request. The last active administrator cannot be demoted or disabled. Users are managed at `/admin/users`, and everyone can change their own password at `/account`.
+Roles: **Admin** (editor plus user management), **Editor** (translation editor), **None** (signed in, no access). Role changes and disabling a user take effect on the next request. The last active administrator cannot be demoted or disabled. Administrators manage users on the **Users** page, and everyone can change their own password on the account page their name at the bottom of the menu links to.
 
 Data Protection keys (which protect the sign-in cookie) are stored in the database, so sessions survive restarts and work across replicas. They are stored unencrypted; protect access to the database accordingly.
 
@@ -127,13 +127,13 @@ Users are created on their first sign-in. To use OIDC only, set `Polyglot__Auth_
 
 ### History
 
-Every change to a translation is recorded with its old and new value, who made it and when. Editors and administrators see the history at `/history`, can filter it by key, language, user or the days of the change (in UTC), and can undo a change. An undo sets the translation back to its value before that change, and is recorded as a change of its own.
+Every change to a translation is recorded with its old and new value, who made it and when. Editors and administrators see the history on the **History** page, can filter it by key, language, user or the days of the change (in UTC), and can undo a change. An undo sets the translation back to its value before that change, and is recorded as a change of its own.
 
 The history is kept in the database next to the users, so it needs authentication to be enabled. Nothing is removed from it yet.
 
 ### Delivery API
 
-A read-only HTTP API from which consuming apps fetch their translations. It authenticates with API keys, which administrators issue at `/admin/api-keys`. A new key is shown once, when it is created. Requires authentication to be enabled.
+A read-only HTTP API from which consuming apps fetch their translations. It authenticates with API keys, which administrators issue on the **API keys** page. A new key is shown once, when it is created. Requires authentication to be enabled.
 
 ```bash
 curl -H "X-Api-Key: pg_7fk2ab91_..." https://polyglot.example.com/api/v1/cultures
@@ -175,15 +175,20 @@ The demo does not reset itself. Give it a database that is recreated on a schedu
 | `Polyglot__Demo__Enabled` | `false` | Turns the demo on. Needs local sign-in. |
 | `Polyglot__Demo__Username` / `Password` | `demo` / `polyglot-demo` | The demo administrator, shown on the sign-in page. |
 | `Polyglot__Demo__ApiKey` | a fixed public token | The demo's API key, shown with example `curl` calls on the overview and API keys pages, and filled in on the API reference. |
-| `Polyglot__Demo__Notice` | a generic notice | Shown on every page. Say here when the data is reset. |
+| `Polyglot__Demo__Notice` | a generic notice | Shown above every page. Say here when the data is reset. |
 
 ## Development
 
+Every page after sign-in (overview, translations, history, users, API keys, account) is a Way of one [Way.Shell](https://github.com/kododo-dev/WayShell) panel at the root of the app, so they share one menu, theme and language. The translations page is the CultureWay editor; the others are one React module in `src/Polyglot.Web/UI`, embedded in the app, with a JSON API per page (`Ways/PolyglotWays.cs`). Only sign-in and "access denied" are server-rendered pages.
+
 ```bash
+cd src/Polyglot.Web/UI && npm ci && npm run build && cd ../../..   # the pages' module; dotnet build needs it
 dotnet test src/Polyglot.slnx   # needs Docker (Testcontainers)
 dotnet run --project src/Polyglot.Web
 docker compose up --build       # builds the image from source, with PostgreSQL
 ```
+
+`npm run dev` in `src/Polyglot.Web/UI` serves one page (`?way=history`) with hot reload, its API proxied to `dotnet run`. Browser scenarios for the demo are in [e2e/check.mjs](e2e/check.mjs).
 
 Adding an EF Core migration for the auth tables:
 

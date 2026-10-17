@@ -12,7 +12,7 @@ namespace Kododo.Polyglot.Web.Pages;
 [IgnoreAntiforgeryToken]
 public class LogoutModel : PageModel
 {
-    public IActionResult OnGet() => RedirectToPage("/Index");
+    public IActionResult OnGet() => LocalRedirect(Url.Content("~/"));
 
     public async Task<IActionResult> OnPostAsync()
     {

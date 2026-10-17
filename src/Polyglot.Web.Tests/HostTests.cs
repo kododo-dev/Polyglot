@@ -32,14 +32,18 @@ public class HostTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Root_RedirectsToEditor()
+    public async Task Root_IsThePanel_WithOnlyTheEditor()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.GetAsync("/");
+        var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/translations/", response.Headers.Location?.OriginalString);
+        // Without sign-in there are no users, keys or history: the panel has the editor only.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"mode\":\"panel\"", html);
+        Assert.Contains("\"id\":\"translations\"", html);
+        Assert.DoesNotContain("\"id\":\"overview\"", html);
     }
 
     [Fact]

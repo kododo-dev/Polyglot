@@ -4,3 +4,5 @@
 **/bin
 **/obj
 **/*.user
+**/node_modules
+src/Polyglot.Web/UI/dist

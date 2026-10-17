@@ -2,16 +2,26 @@
 
     <PropertyGroup>
         <IsPackable>false</IsPackable>
+        <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+        <!-- npm builds the UI: none of its files are content of the app, only the build embedded below. -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);UI\**</DefaultItemExcludes>
     </PropertyGroup>
+
+    <!-- The pages' Way.Shell module, built by `npm ci && npm run build` in UI/. -->
+    <ItemGroup>
+        <EmbeddedResource Include="UI\dist\**\*" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Kododo.CultureWay" />
         <PackageReference Include="Kododo.CultureWay.UI" />
+        <PackageReference Include="Kododo.Way.Shell" />
         <PackageReference Include="Kododo.CultureWay.PostgreSQL" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+        <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
         <PackageReference Include="Scalar.AspNetCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
@@ -19,5 +29,10 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
+
+    <Target Name="EnsureUiBuilt" BeforeTargets="BeforeBuild">
+        <Error Condition="!Exists('$(MSBuildProjectDirectory)/UI/dist/way.js')"
+               Text="UI\dist\way.js is missing. Run 'npm ci &amp;&amp; npm run build' in src/Polyglot.Web/UI first." />
+    </Target>
 
 </Project>

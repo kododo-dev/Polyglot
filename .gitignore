@@ -6,3 +6,5 @@
 *.suo
 TestResults/
 *.trx
+node_modules/
+src/Polyglot.Web/UI/dist/

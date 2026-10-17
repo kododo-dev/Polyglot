@@ -1,25 +1,22 @@
 using System.Net;
-using System.Text.RegularExpressions;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Kododo.Polyglot.Web.Api;
 using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using static Kododo.Polyglot.Web.Tests.WayClient;
 
 namespace Kododo.Polyglot.Web.Tests;
 
 [Collection(PostgresCollection.Name)]
-public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncLifetime
+public sealed class ApiKeysWayTests(PostgresFixture postgres) : IAsyncLifetime
 {
     private const string AdminPassword = "bootstrap-password-1";
+    private const string Way = "api-keys";
 
     private readonly List<WebApplicationFactory<Program>> _factories = [];
-
-    [GeneratedRegex("name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"")]
-    private static partial Regex AntiforgeryPattern();
-
-    [GeneratedRegex(@"pg_[a-z0-9]{8}_[A-Za-z0-9]{43}")]
-    private static partial Regex ApiTokenPattern();
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -41,33 +38,11 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
         return factory;
     }
 
-    private static HttpClient NewClient(WebApplicationFactory<Program> factory)
-        => factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+    private static Task<HttpClient> SignInAsAdminAsync(WebApplicationFactory<Program> factory)
+        => SignInAsync(factory, "admin", AdminPassword);
 
-    private static async Task<string> AntiforgeryAsync(HttpClient client, string url)
-        => AntiforgeryPattern().Match(await client.GetStringAsync(url)).Groups[1].Value;
-
-    private static async Task<HttpClient> SignInAsync(
-        WebApplicationFactory<Program> factory, string username = "admin", string password = AdminPassword)
-    {
-        var client = NewClient(factory);
-        var token = await AntiforgeryAsync(client, "/login");
-        var login = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["Username"] = username,
-            ["Password"] = password,
-            ["__RequestVerificationToken"] = token,
-        }));
-        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
-        return client;
-    }
-
-    private static async Task<HttpResponseMessage> PostAsync(
-        HttpClient client, string handler, Dictionary<string, string> fields)
-    {
-        fields["__RequestVerificationToken"] = await AntiforgeryAsync(client, "/admin/api-keys");
-        return await client.PostAsync($"/admin/api-keys?handler={handler}", new FormUrlEncodedContent(fields));
-    }
+    private static async Task<string> CreateKeyAsync(HttpClient admin, string name)
+        => (await GetAsync(admin, Way, "CreateKey", new { name })).GetProperty("token").GetString()!;
 
     private static async Task<ApiKey> SingleKeyAsync(WebApplicationFactory<Program> factory)
     {
@@ -83,40 +58,37 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
     }
 
     [Fact]
-    public async Task CreatedKey_IsShownOnce_AndWorks()
+    public async Task CreatedKey_IsReturnedOnce_AndWorks()
     {
         var factory = await CreateAppAsync();
-        var admin = await SignInAsync(factory);
+        var admin = await SignInAsAdminAsync(factory);
 
-        var created = await PostAsync(admin, "Create", new() { ["Input.Name"] = "shop-frontend-prod" });
-        var html = await created.Content.ReadAsStringAsync();
-        var token = ApiTokenPattern().Match(html).Value;
+        var created = await PostAsync(admin, Way, "CreateKey", new { name = "shop-frontend-prod" });
+        var token = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
 
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         Assert.Contains("no-store", created.Headers.CacheControl?.ToString());
-        Assert.NotEmpty(token);
+        Assert.Matches(@"^pg_[a-z0-9]{8}_[A-Za-z0-9]{43}$", token);
         Assert.Equal(HttpStatusCode.OK, await CallApiAsync(factory, token));
 
         // Afterwards the list shows the public identifier only.
-        var list = await admin.GetStringAsync("/admin/api-keys");
+        var list = await GetAsync(admin, Way, "ApiKeys");
         var key = await SingleKeyAsync(factory);
-        Assert.DoesNotMatch(ApiTokenPattern(), list);
-        Assert.Contains($"pg_{key.KeyId}_", list);
-        Assert.Contains("shop-frontend-prod", list);
+        Assert.DoesNotContain(token, list.GetRawText());
+        var listed = Assert.Single(list.GetProperty("keys").EnumerateArray());
+        Assert.Equal($"pg_{key.KeyId}_…", listed.GetProperty("prefix").GetString());
+        Assert.Equal("shop-frontend-prod", listed.GetProperty("name").GetString());
+        Assert.Equal("active", listed.GetProperty("status").GetString());
     }
 
     [Fact]
     public async Task CreatedKey_RecordsItsIssuerAndExpiry()
     {
         var factory = await CreateAppAsync();
-        var admin = await SignInAsync(factory);
+        var admin = await SignInAsAdminAsync(factory);
         var validThrough = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
 
-        await PostAsync(admin, "Create", new()
-        {
-            ["Input.Name"] = "expiring",
-            ["Input.ValidThrough"] = validThrough.ToString("yyyy-MM-dd"),
-        });
+        await GetAsync(admin, Way, "CreateKey", new { name = "expiring", validThrough = validThrough.ToString("yyyy-MM-dd") });
 
         var key = await SingleKeyAsync(factory);
         Assert.NotNull(key.CreatedByUserId);
@@ -132,17 +104,11 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
     public async Task InvalidInput_IsReported_AndCreatesNothing(string name, string? validThrough)
     {
         var factory = await CreateAppAsync();
-        var admin = await SignInAsync(factory);
+        var admin = await SignInAsAdminAsync(factory);
 
-        var fields = new Dictionary<string, string> { ["Input.Name"] = name };
-        if (validThrough is not null)
-            fields["Input.ValidThrough"] = validThrough;
-        var response = await PostAsync(admin, "Create", fields);
-        var html = await response.Content.ReadAsStringAsync();
+        var errors = await ErrorsAsync(await PostAsync(admin, Way, "CreateKey", new { name, validThrough }));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("alert-error", html);
-        Assert.DoesNotMatch(ApiTokenPattern(), html);
+        Assert.NotEmpty(errors);
         await using var scope = factory.Services.CreateAsyncScope();
         Assert.Empty(await scope.ServiceProvider.GetRequiredService<ApiKeyService>().ListAsync());
     }
@@ -151,20 +117,19 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
     public async Task DisablingAndDeleting_RevokeTheKey()
     {
         var factory = await CreateAppAsync();
-        var admin = await SignInAsync(factory);
-        var created = await PostAsync(admin, "Create", new() { ["Input.Name"] = "consumer" });
-        var token = ApiTokenPattern().Match(await created.Content.ReadAsStringAsync()).Value;
-        var id = (await SingleKeyAsync(factory)).Id.ToString();
+        var admin = await SignInAsAdminAsync(factory);
+        var token = await CreateKeyAsync(admin, "consumer");
+        var id = (await SingleKeyAsync(factory)).Id;
 
-        var disabled = await PostAsync(admin, "Disabled", new() { ["id"] = id, ["disabled"] = "true" });
-        Assert.Equal(HttpStatusCode.Redirect, disabled.StatusCode);
+        var disabled = await PostAsync(admin, Way, "SetKeyDisabled", new { id, disabled = true });
+        Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, await CallApiAsync(factory, token));
 
-        await PostAsync(admin, "Disabled", new() { ["id"] = id, ["disabled"] = "false" });
+        await PostAsync(admin, Way, "SetKeyDisabled", new { id, disabled = false });
         Assert.Equal(HttpStatusCode.OK, await CallApiAsync(factory, token));
 
-        var deleted = await PostAsync(admin, "Delete", new() { ["id"] = id });
-        Assert.Equal(HttpStatusCode.Redirect, deleted.StatusCode);
+        var deleted = await PostAsync(admin, Way, "DeleteKey", new { id });
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, await CallApiAsync(factory, token));
     }
 
@@ -177,25 +142,26 @@ public sealed partial class ApiKeysPageTests(PostgresFixture postgres) : IAsyncL
                 .CreateLocalAsync("erin", null, "erin-password-1", UserRole.Editor);
         var editor = await SignInAsync(factory, "erin", "erin-password-1");
 
-        var page = await editor.GetAsync("/admin/api-keys");
+        var page = await editor.GetAsync($"/{Way}/");
 
         Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
         Assert.Equal("/forbidden", page.Headers.Location?.AbsolutePath);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(editor, Way, "ApiKeys")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(editor, Way, "CreateKey", new { name = "sneaky" })).StatusCode);
     }
 
     [Fact]
-    public async Task ApiKey_CannotOpenThePage()
+    public async Task ApiKey_CannotUseThePage()
     {
         var factory = await CreateAppAsync();
-        var admin = await SignInAsync(factory);
-        var created = await PostAsync(admin, "Create", new() { ["Input.Name"] = "consumer" });
-        var token = ApiTokenPattern().Match(await created.Content.ReadAsStringAsync()).Value;
+        var token = await CreateKeyAsync(await SignInAsAdminAsync(factory), "consumer");
 
         var client = NewClient(factory);
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationHandler.HeaderName, token);
-        var page = await client.GetAsync("/admin/api-keys");
+        var page = await client.GetAsync($"/{Way}/");
 
         Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
         Assert.Equal("/login", page.Headers.Location?.AbsolutePath);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostAsync(client, Way, "ApiKeys")).StatusCode);
     }
 }

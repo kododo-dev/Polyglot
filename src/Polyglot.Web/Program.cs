@@ -7,6 +7,7 @@ using Kododo.Polyglot.Web.Auth;
 using Kododo.Polyglot.Web.Data;
 using Kododo.Polyglot.Web.Demo;
 using Kododo.Polyglot.Web.History;
+using Kododo.Polyglot.Web.Ways;
 using Kododo.Way.Shell;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
@@ -40,7 +41,7 @@ var healthChecks = builder.Services.AddHealthChecks();
 if (!string.IsNullOrWhiteSpace(connectionString))
     healthChecks.AddCheck("database", new DatabaseHealthCheck(connectionString), tags: ["ready"]);
 
-builder.Services.AddWayShell(shell => EditorIntegration.ConfigureShell(shell, polyglot, auth.Enabled));
+builder.Services.AddWayShell(shell => EditorIntegration.ConfigureShell(shell, auth.Enabled, demo));
 builder.Services.AddCultureWay(x =>
 {
     x.Options.SupportedCultures = cultures;
@@ -52,7 +53,7 @@ builder.Services.AddCultureWay(x =>
 
 if (auth.Enabled)
 {
-    builder.Services.AddPolyglotAuth(connectionString!, auth, editorPath);
+    builder.Services.AddPolyglotAuth(connectionString!, auth);
     // The history needs the database, and a user to attribute changes to.
     builder.Services.AddPolyglotHistory();
 }
@@ -103,12 +104,10 @@ app.MapHealthChecks("/health/ready");
 
 if (auth.Enabled)
 {
-    // The pages' stylesheet, script and icon; open to everyone, since the sign-in page needs them.
+    // The sign-in page and its stylesheet, script and icon; open to everyone.
     app.MapStaticAssets();
     app.MapRazorPages().WithStaticAssets();
 }
-else
-    app.MapGet("/", (HttpContext ctx) => Results.Redirect($"{ctx.Request.PathBase}{editorPath}/"));
 
 if (apiEnabled)
 {
@@ -121,12 +120,23 @@ if (apiEnabled)
     }
 }
 
+// Every page is a Way in the shell's panel at the root, which lists those the user may open, in this order.
+var panel = app.UseWayShell("/");
+if (auth.Enabled)
+    app.MapOverviewWay();
 var editor = app.UseCultureWay(editorPath);
 if (auth.Enabled)
+{
+    panel.RequireAuthorization();
     editor.RequireAuthorization(PolyglotPolicies.Editor);
+    app.MapAdminWays();
+}
 else
+{
     // Without sign-in anyone may edit, as the warning above says; outside Development the editor otherwise answers 403.
+    panel.AllowAnonymous();
     editor.AllowAnonymous();
+}
 
 app.Run();
 

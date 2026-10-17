@@ -122,6 +122,9 @@ public sealed partial class AuthTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
         Assert.Equal("/polyglot/", login.Headers.Location?.OriginalString);
         Assert.Equal(HttpStatusCode.OK, api.StatusCode);
+        // The panel at the instance's address, with and without the trailing slash (without it the path is empty).
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/polyglot/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/polyglot")).StatusCode);
     }
 
     [Fact]

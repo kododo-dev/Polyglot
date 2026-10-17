@@ -1,0 +1,33 @@
+name: Deploy Demo
+
+# The public demo (kododo.dev/polyglot/demo) runs with docker compose on the VPS, from the image tagged latest. After a
+# release publishes the image, the demo pulls it; a pre-release does not move latest, so it changes nothing there.
+on:
+  workflow_run:
+    workflows: [Publish Docker image]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: GHCR_TOKEN,REPO_OWNER
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$REPO_OWNER" --password-stdin
+            cd /opt/docker/polyglot-demo
+            docker compose pull polyglot
+            docker compose up -d polyglot

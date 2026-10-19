@@ -94,6 +94,8 @@ export default function HistoryPage() {
   })
 
   const field = { size: 'small', slotProps: { inputLabel: { shrink: true } } } as const
+  // Shows "All" / "Anyone" when nothing is chosen; a select hides its empty option otherwise.
+  const selectField = { size: 'small', slotProps: { inputLabel: { shrink: true }, select: { displayEmpty: true } } } as const
 
   return (
     <>
@@ -107,12 +109,12 @@ export default function HistoryPage() {
               <Box component="form" role="search" onSubmit={submit} sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'flex-end' }}>
                 <TextField {...field} label={t('key')} placeholder={t('partOfAKey')} value={draft.key ?? ''} autoComplete="off"
                   onChange={(e) => setDraft({ ...draft, key: e.target.value })} sx={{ flex: '2 1 200px' }} />
-                <TextField {...field} select label={t('language')} value={draft.culture ?? ''}
+                <TextField {...selectField} select label={t('language')} value={draft.culture ?? ''}
                   onChange={(e) => setDraft({ ...draft, culture: e.target.value })} sx={{ flex: '1 1 130px' }}>
                   <MenuItem value="">{t('all')}</MenuItem>
                   {h.cultures.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
                 </TextField>
-                <TextField {...field} select label={t('changedBy')} value={draft.userId ?? ''}
+                <TextField {...selectField} select label={t('changedBy')} value={draft.userId ?? ''}
                   onChange={(e) => setDraft({ ...draft, userId: e.target.value })} sx={{ flex: '1 1 130px' }}>
                   <MenuItem value="">{t('anyone')}</MenuItem>
                   {h.users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
